@@ -15,13 +15,16 @@ stringData:
   port: "5432"
 ---
 # PVC for postgres data
+# NOTE: wave -1 same as Deployment so ArgoCD applies them together.
+# WaitForFirstConsumer PVCs won't bind until a pod mounts them;
+# co-applying with the Deployment lets the pod trigger the bind.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: keycloak-pgsql-data
   namespace: keycloak
   annotations:
-    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   accessModes:
     - ReadWriteOnce
