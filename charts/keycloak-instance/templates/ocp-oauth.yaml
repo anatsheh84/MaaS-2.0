@@ -1,0 +1,38 @@
+---
+# Client secret for OpenShift OAuth → Keycloak integration
+# Must live in openshift-config namespace
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openid-client-secret-rhbk
+  namespace: openshift-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+stringData:
+  clientSecret: {{ .Values.keycloak.clientSecret }}
+---
+# Configure OpenShift to use Keycloak/RHBK as an identity provider
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  identityProviders:
+    - name: rhbk
+      mappingMethod: claim
+      type: OpenID
+      openID:
+        clientID: idp-4-ocp
+        clientSecret:
+          name: openid-client-secret-rhbk
+        issuer: https://sso.{{ .Values.domain }}/realms/sso
+        claims:
+          preferredUsername:
+            - preferred_username
+          name:
+            - name
+          email:
+            - email
+        extraScopes: []

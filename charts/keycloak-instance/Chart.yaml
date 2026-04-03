@@ -1,0 +1,6 @@
+apiVersion: v2
+name: keycloak-instance
+description: Keycloak (RHBK) instance — PostgreSQL, Keycloak CR, sso realm, route, and OCP OAuth integration
+type: application
+version: 0.1.0
+appVersion: 0.1.0

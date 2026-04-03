@@ -1,0 +1,35 @@
+# Set from bootstrap Application helm values
+domain: ""
+
+db:
+  user: keycloak
+  name: keycloak
+  # DB password — same value as MaaS reference cluster
+  password: "8WRQIFpF0Q"
+  storageClass: gp3-csi
+  storageSize: 50Gi
+
+keycloak:
+  # OIDC client secret shared between Keycloak and OpenShift OAuth
+  clientSecret: "wJZqTzNNw5"
+
+realm:
+  users:
+    - username: user1
+      firstName: User1
+      lastName: Demo
+      email: user1@demo.redhat.com
+      password: MTkxNDU3
+      role: user
+    - username: user2
+      firstName: User2
+      lastName: Demo
+      email: user2@demo.redhat.com
+      password: MTkxNDU3
+      role: user
+    - username: admin
+      firstName: Admin
+      lastName: Demo
+      email: admin@demo.redhat.com
+      password: NDcxOTE3
+      role: admin

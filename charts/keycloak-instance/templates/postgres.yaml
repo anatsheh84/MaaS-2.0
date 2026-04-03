@@ -1,0 +1,108 @@
+---
+# DB credentials secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keycloak-pgsql-user
+  namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+stringData:
+  user: {{ .Values.db.user }}
+  password: {{ .Values.db.password }}
+  dbname: {{ .Values.db.name }}
+  host: keycloak-pgsql.keycloak.svc
+  port: "5432"
+---
+# PVC for postgres data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-pgsql-data
+  namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.db.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.db.storageSize }}
+---
+# PostgreSQL deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak-pgsql
+  namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak-pgsql
+  template:
+    metadata:
+      labels:
+        app: keycloak-pgsql
+    spec:
+      containers:
+        - name: pgsql
+          image: registry.redhat.io/rhel9/postgresql-16:1-1754433677
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-pgsql-user
+                  key: user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-pgsql-user
+                  key: password
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-pgsql-user
+                  key: dbname
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: pgsql-storage
+              mountPath: /var/lib/pgsql/data
+      volumes:
+        - name: pgsql-storage
+          persistentVolumeClaim:
+            claimName: keycloak-pgsql-data
+---
+# PostgreSQL service
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-pgsql
+  namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  selector:
+    app: keycloak-pgsql
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP

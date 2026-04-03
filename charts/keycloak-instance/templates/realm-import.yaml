@@ -1,0 +1,56 @@
+---
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: sso
+  namespace: keycloak
+  annotations:
+    # Wait for Keycloak to be Ready before importing the realm
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  keycloakCRName: keycloak
+  realm:
+    id: sso
+    realm: sso
+    enabled: true
+    sslRequired: external
+    loginWithEmailAllowed: true
+    duplicateEmailsAllowed: false
+    registrationAllowed: true
+    roles:
+      realm:
+        - name: user
+          description: Default user role
+        - name: admin
+          description: Administrator role
+    groups:
+      - name: admins
+      - name: users
+    clients:
+      - clientId: idp-4-ocp
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        serviceAccountsEnabled: true
+        clientAuthenticatorType: client-secret
+        secret: {{ .Values.keycloak.clientSecret }}
+        redirectUris:
+          - "*"
+        frontchannelLogout: false
+    users:
+    {{- range .Values.realm.users }}
+      - username: {{ .username }}
+        firstName: {{ .firstName }}
+        lastName: {{ .lastName }}
+        email: {{ .email }}
+        emailVerified: true
+        enabled: true
+        realmRoles:
+          - {{ .role }}
+        credentials:
+          - type: password
+            value: {{ .password }}
+            temporary: false
+    {{- end }}
