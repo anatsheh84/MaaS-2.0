@@ -1,17 +1,20 @@
 # Override these from the bootstrap Application helm values block
-infrID: ""
-ami: ""
+infrID: ""  # Note: overridden by Application as 'infraID'; this default is never used
+amd: ""
 region: us-east-2
 guid: ""
 uuid: ""
 
 # Worker MachineSets
-# Cluster only has subnets in us-east-2c; all 5 workers go there
+# Cluster installed single-AZ — only us-east-2c has VPC private subnets.
+# All 5 workers consolidated here. If multi-AZ subnets are added later,
+# split this into 3 entries (1/2/2) matching the MaaS reference topology.
 workers:
   - az: us-east-2c
     replicas: 5
 
-# GPU MachineSet — g6e.2xlarge (NVIDIA L40S)
+# GPU MachineSet — g6e.2xlarge with NVIDIA L40S (46GB VRAM)
+# Taint: nvidia.com/gpu=l40-gpu:NoSchedule
 gpu:
   az: us-east-2c
   replicas: 1

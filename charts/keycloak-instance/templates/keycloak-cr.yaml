@@ -27,7 +27,6 @@ spec:
     tlsSecret: keycloak-tls
   ingress:
     enabled: false
-  instances: 1
   transaction:
     xaEnabled: true
   additionalOptions:

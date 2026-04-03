@@ -1,8 +1,21 @@
 ---
-# Patch the operator-managed keycloak-service to trigger Service CA cert generation.
-# The RHBK operator creates this service; we only manage the annotation here.
-# Service CA will create the 'keycloak-tls' Secret automatically once it sees
-# the serving-cert annotation, which the Keycloak CR references via http.tlsSecret.
+# Annotation-only SSA patch for the RHBK-operator-managed keycloak-service.
+#
+# Why this file exists:
+#   The RHBK operator creates 'keycloak-service' but does NOT add the OpenShift
+#   Service CA annotation on its own. Without the annotation, Service CA never
+#   generates the 'keycloak-tls' Secret, and the keycloak-0 pod fails to start
+#   with: MountVolume.SetUp failed — secret "keycloak-tls" not found
+#
+# SSA ownership model:
+#   - We declare ONLY metadata.annotations here so ArgoCD owns just that field.
+#   - The RHBK operator exclusively owns spec.ports, spec.selector, etc.
+#   - No SSA field ownership conflict between ArgoCD and the operator.
+#
+# Effect:
+#   Service CA sees the annotation and auto-generates the 'keycloak-tls'
+#   TLS Secret signed for keycloak-service.keycloak.svc, which the Keycloak
+#   CR mounts via spec.http.tlsSecret: keycloak-tls.
 apiVersion: v1
 kind: Service
 metadata:
@@ -11,19 +24,3 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
     service.beta.openshift.io/serving-cert-secret-name: keycloak-tls
-spec:
-  # Ports are operator-managed; we declare them here only for SSA field ownership.
-  # ArgoCD uses ServerSideApply so only our owned fields (annotations) are enforced.
-  ports:
-    - name: https
-      port: 8443
-      protocol: TCP
-      targetPort: 8443
-    - name: management
-      port: 9000
-      protocol: TCP
-      targetPort: 9000
-  selector:
-    app: keycloak
-    app.kubernetes.io/instance: keycloak
-    app.kubernetes.io/managed-by: keycloak-operator
