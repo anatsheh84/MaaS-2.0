@@ -1,0 +1,50 @@
+# Phase 1 - ArgoCD instance configuration
+# This ensures the ArgoCD instance is configured with cluster-admin
+# and resource tracking via annotation (matching MaaS cluster)
+---
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  resourceTrackingMethod: annotation
+  server:
+    autoscale:
+      enabled: false
+    grpc:
+      ingress:
+        enabled: false
+    ingress:
+      enabled: false
+    route:
+      enabled: true
+      tls:
+        termination: reencrypt
+  ha:
+    enabled: false
+  rbac:
+    defaultPolicy: ''
+    policy: |
+      g, system:cluster-admins, role:admin
+      g, cluster-admins, role:admin
+    scopes: '[groups]'
+  repo: {}
+  dex:
+    openShiftOAuth: true
+  applicationSet:
+    resources:
+      limits:
+        cpu: "2"
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+  controller:
+    resources:
+      limits:
+        cpu: "2"
+        memory: 2Gi
+      requests:
+        cpu: 250m
+        memory: 1Gi
