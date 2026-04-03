@@ -5,18 +5,15 @@ region: us-east-2
 guid: ""
 uuid: ""
 
-# Worker MachineSets — m6a.4xlarge spread 1/2/2 across AZs
+# Worker MachineSets
+# Cluster only has subnets in us-east-2c; all 5 workers go there
 workers:
-  - az: us-east-2a
-    replicas: 1
-  - az: us-east-2b
-    replicas: 2
   - az: us-east-2c
-    replicas: 2
+    replicas: 5
 
-# GPU MachineSet — g6e.2xlarge (NVIDIA L40S) in us-east-2a
+# GPU MachineSet — g6e.2xlarge (NVIDIA L40S)
 gpu:
-  az: us-east-2a
+  az: us-east-2c
   replicas: 1
   instanceType: g6e.2xlarge
   volumeSize: 250
