@@ -15,5 +15,6 @@ spec:
     insecureEdgeTerminationPolicy: Redirect
   to:
     kind: Service
-    name: keycloak
+    # RHBK operator creates the service as '<cr-name>-service', not '<cr-name>'
+    name: keycloak-service
     weight: 100
