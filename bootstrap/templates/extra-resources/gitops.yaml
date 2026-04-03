@@ -1,5 +1,10 @@
 # ArgoCD instance configuration
-# Kept minimal to avoid drift — the GitOps operator fills in defaults
+# bootstrap/templates/extra-resources/gitops.yaml
+#
+# IMPORTANT: setup/bootstrap.yaml has ignoreDifferences on ArgoCD /spec so that
+# operator-added defaults (grafana, prometheus, redis, etc.) don't cause constant
+# drift. However ArgoCD WILL apply this spec on every sync triggered by a git
+# change, so any field set here takes effect.
 ---
 apiVersion: v1
 kind: Namespace
@@ -15,3 +20,23 @@ metadata:
   namespace: openshift-gitops
 spec:
   resourceTrackingMethod: annotation
+  server:
+    # insecure: true — ArgoCD server runs HTTP internally; TLS is terminated
+    # at the OpenShift Route (edge termination). Required when route.tls is set.
+    insecure: true
+    autoscale:
+      enabled: false
+    grpc:
+      ingress:
+        enabled: false
+    ingress:
+      enabled: false
+    route:
+      # This is the field the GitOps operator checks to create the Route.
+      # Without enabled: true the route is never created and the UI is inaccessible.
+      enabled: true
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+    service:
+      type: ""
