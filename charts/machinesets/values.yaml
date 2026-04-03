@@ -1,0 +1,22 @@
+# Override these from the bootstrap Application helm values block
+infrID: ""
+ami: ""
+region: us-east-2
+guid: ""
+uuid: ""
+
+# Worker MachineSets — m6a.4xlarge spread 1/2/2 across AZs
+workers:
+  - az: us-east-2a
+    replicas: 1
+  - az: us-east-2b
+    replicas: 2
+  - az: us-east-2c
+    replicas: 2
+
+# GPU MachineSet — g6e.2xlarge (NVIDIA L40S) in us-east-2a
+gpu:
+  az: us-east-2a
+  replicas: 1
+  instanceType: g6e.2xlarge
+  volumeSize: 250

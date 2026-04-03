@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: machinesets
+  namespace: openshift-gitops
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/machinesets
+    helm:
+      values: |
+        infraID: {{ .Values.cluster.infraID }}
+        ami: {{ .Values.aws.ami }}
+        region: {{ .Values.cluster.region }}
+        guid: {{ .Values.aws.guid }}
+        uuid: "{{ .Values.aws.uuid }}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-machine-api
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

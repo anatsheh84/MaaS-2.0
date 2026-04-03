@@ -1,0 +1,91 @@
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: {{ .Values.infraID }}-worker-gpu-{{ .Values.gpu.az }}
+  namespace: openshift-machine-api
+  labels:
+    machine.openshift.io/cluster-api-cluster: {{ .Values.infraID }}
+  annotations:
+    capacity.cluster-autoscaler.kubernetes.io/labels: kubernetes.io/arch=amd64
+    machine.openshift.io/GPU: "1"
+    machine.openshift.io/memoryMb: "65536"
+    machine.openshift.io/vCPU: "8"
+spec:
+  replicas: {{ .Values.gpu.replicas }}
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: {{ .Values.infraID }}
+      machine.openshift.io/cluster-api-machine-role: worker-gpu
+      machine.openshift.io/cluster-api-machine-type: worker-gpu
+      machine.openshift.io/cluster-api-machineset: {{ .Values.infraID }}-worker-gpu-{{ .Values.gpu.az }}
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: {{ .Values.infraID }}
+        machine.openshift.io/cluster-api-machine-role: worker-gpu
+        machine.openshift.io/cluster-api-machine-type: worker-gpu
+        machine.openshift.io/cluster-api-machineset: {{ .Values.infraID }}-worker-gpu-{{ .Values.gpu.az }}
+    spec:
+      lifecycleHooks: {}
+      metadata:
+        labels:
+          node-role.kubernetes.io/worker-gpu: ""
+      providerSpec:
+        value:
+          ami:
+            id: {{ .Values.ami }}
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              iops: 0
+              kmsKey: {}
+              volumeSize: {{ .Values.gpu.volumeSize }}
+              volumeType: gp3
+          capacityReservationId: ""
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: {{ .Values.infraID }}-worker-profile
+          instanceType: {{ .Values.gpu.instanceType }}
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: {{ .Values.gpu.az }}
+            region: {{ .Values.region }}
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - {{ .Values.infraID }}-node
+          - filters:
+            - name: tag:Name
+              values:
+              - {{ .Values.infraID }}-lb
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - {{ .Values.infraID }}-subnet-private-{{ .Values.gpu.az }}
+          tags:
+          - name: kubernetes.io/cluster/{{ .Values.infraID }}
+            value: owned
+          - name: env_type
+            value: ocp4-cluster
+          - name: guid
+            value: {{ .Values.guid }}
+          - name: owner
+            value: unknown
+          - name: platform
+            value: RHPDS
+          - name: uuid
+            value: "{{ .Values.uuid }}"
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        value: l40-gpu

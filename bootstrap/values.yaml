@@ -12,6 +12,8 @@ cluster:
 
 aws:
   ami: ami-021a620474c1cd2fe
+  guid: mfm68
+  uuid: "2aa7ec64-e90d-591f-81be-ed049ef053e2"
   azs:
     - us-east-2a
     - us-east-2b

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: machinesets
+description: AWS MachineSets for MaaS 2.0 — m6a.4xlarge workers + g6e.2xlarge GPU worker
+type: application
+version: 0.1.0
+appVersion: 0.1.0
