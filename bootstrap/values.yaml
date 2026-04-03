@@ -1,0 +1,18 @@
+# MaaS 2.0 Bootstrap Configuration
+bootstrap:
+  repoURL: https://github.com/anatsheh84/MaaS-2.0
+  targetRevision: main
+
+cluster:
+  infraID: cluster-mfm68-hsq8s
+  apiUrl: https://api.cluster-mfm68.mfm68.sandbox2356.opentlc.com:6443
+  domain: apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com
+  region: us-east-2
+  platform: AWS
+
+aws:
+  ami: ami-021a620474c1cd2fe
+  azs:
+    - us-east-2a
+    - us-east-2b
+    - us-east-2c
