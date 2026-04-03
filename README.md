@@ -9,7 +9,7 @@ bootstrap/          ← Root Helm chart (app-of-apps)
   values.yaml       ← Cluster-specific config (infraID, domain, AMI, etc.)
   templates/
     applications/   ← ArgoCD Application CRs (one per component)
-    extra-resources/ ← ArgoCD CR minimal config
+    extra-resources/ ← ArgoCD CR config (server route, resourceTrackingMethod)
 
 charts/             ← Local Helm charts for each component
   machinesets/      ← AWS MachineSets (workers + GPU)
@@ -44,6 +44,12 @@ setup/              ← One-time manual bootstrap manifests (run once, not GitOp
 > installed single-AZ so all nodes land in us-east-2c. If multi-AZ subnets are added
 > later, update `charts/machinesets/values.yaml` to split workers across AZs.
 
+## ArgoCD
+
+**UI:** `https://openshift-gitops-server-openshift-gitops.apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com`
+
+**Login:** Use the `kubeadmin` password or the `admin` OpenShift user.
+
 ## ArgoCD Application Sync Waves
 
 | Wave | Application | Description |
@@ -72,12 +78,30 @@ setup/              ← One-time manual bootstrap manifests (run once, not GitOp
 
 ## Known Operational Notes (Lessons Learned)
 
-### 1. MachineSets — Single-AZ only
+### 1. ArgoCD UI Route — Must be explicit in ArgoCD CR spec
+
+The OpenShift GitOps operator does **not** create the ArgoCD server Route by default.
+`spec.server.route.enabled: true` must be set explicitly in the ArgoCD CR, or the UI
+will be completely unreachable.
+
+**Additional gotcha:** `setup/bootstrap.yaml` has `ignoreDifferences` on the ArgoCD CR's
+entire `/spec` to prevent ArgoCD from fighting the operator over its auto-managed defaults
+(grafana, prometheus, redis, etc.). This means ArgoCD **will not** re-apply spec changes
+automatically — it ignores all `/spec` drift. To apply a spec change after initial deploy:
+
+```bash
+oc patch argocd openshift-gitops -n openshift-gitops --type merge -p '{"spec": {...}}'
+```
+
+The route spec is set in `bootstrap/templates/extra-resources/gitops.yaml` and will be
+applied correctly on a **fresh** deploy. On an existing cluster, patch manually as above.
+
+### 2. MachineSets — Single-AZ only
 The VPC was provisioned with private subnets only in `us-east-2c`. Attempting to create
 MachineSets in `us-east-2a`/`us-east-2b` fails with *"no subnet IDs were found"*.
 All 5 workers + GPU node are in `us-east-2c`.
 
-### 2. Keycloak — Service CA TLS
+### 3. Keycloak — Service CA TLS
 The RHBK operator (v26.2) creates a service named `<cr-name>-service` (`keycloak-service`)
 but does **not** add the OpenShift Service CA annotation automatically. Without this,
 the `keycloak-tls` Secret is never generated and the pod fails to start.
@@ -90,12 +114,12 @@ service.beta.openshift.io/serving-cert-secret-name: keycloak-tls
 Service CA then auto-generates `keycloak-tls`. Only the annotation is SSA-owned by
 ArgoCD; the operator owns all `spec` fields — no conflict.
 
-### 3. Keycloak Route — Service Name
+### 4. Keycloak Route — Service Name
 The route must point to `keycloak-service` (not `keycloak`). The `keycloak` service
 does not exist in this operator version. The `https` port on `keycloak-service` (8443)
 is the correct backend.
 
-### 4. PostgreSQL PVC — WaitForFirstConsumer Deadlock
+### 5. PostgreSQL PVC — WaitForFirstConsumer Deadlock
 With `gp3-csi` (`volumeBindingMode: WaitForFirstConsumer`), the PVC stays `Pending`
 until a pod mounts it. ArgoCD waits for PVC health before proceeding to the next
 sync wave, causing a deadlock if PVC and Deployment are in different waves.
@@ -132,3 +156,6 @@ ArgoCD will automatically:
 - Create MachineSets → nodes provision (~10 min)
 - Install cert-manager and Keycloak operators
 - Deploy Keycloak (postgres → Keycloak CR → realm import → route → OCP OAuth)
+
+The ArgoCD UI will be available at:
+`https://openshift-gitops-server-openshift-gitops.apps.<cluster-domain>`
