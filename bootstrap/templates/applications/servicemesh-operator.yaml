@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: servicemesh-operator
+  namespace: openshift-gitops
+  annotations:
+    # Wave 3 — before rhcl-operator (wave 4).
+    # Kuadrant requires servicemeshoperator3 as a dependency. Without an
+    # explicit Automatic subscription, OLM auto-creates one with Manual
+    # approval, blocking the combined install plan on every fresh cluster.
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/servicemesh-operator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-operators
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

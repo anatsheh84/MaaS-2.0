@@ -1,0 +1,24 @@
+---
+# OpenShift Service Mesh 3 subscription.
+#
+# Why this exists as a standalone chart:
+#   Kuadrant (rhcl-operator) declares servicemeshoperator3 as a required
+#   dependency. When this subscription is absent, OLM auto-creates it with
+#   installPlanApproval: Manual, which causes the combined OLM install plan
+#   (rhcl + servicemesh + deps) to require manual approval — blocking Kuadrant
+#   CRD installation entirely on every fresh cluster.
+#
+#   By explicitly owning this subscription with Automatic approval (wave 3,
+#   before rhcl-operator at wave 4), ArgoCD ensures OLM always uses the
+#   correct approval mode and never falls back to the Manual default.
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: servicemeshoperator3
+  namespace: openshift-operators
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: servicemeshoperator3
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace

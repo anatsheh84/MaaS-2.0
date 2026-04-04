@@ -1,0 +1,10 @@
+apiVersion: v2
+name: servicemesh-operator
+description: >
+  OpenShift Service Mesh 3 operator subscription.
+  Must be deployed before rhcl-operator (wave 4) because Kuadrant declares
+  servicemeshoperator3 as a required dependency. If this subscription is not
+  explicitly owned by ArgoCD, OLM auto-creates it with Manual installPlanApproval,
+  which poisons the combined install plan and blocks Kuadrant from installing.
+type: application
+version: 0.1.0
