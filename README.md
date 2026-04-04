@@ -127,6 +127,23 @@ sync wave, causing a deadlock if PVC and Deployment are in different waves.
 **Fix:** PVC and Deployment are in **the same sync wave (-1)** in `postgres.yaml`.
 ArgoCD applies them together; the pod mounts the PVC; the PVC binds.
 
+## User Onboarding Notes
+
+### Logging in
+1. Go to the OpenShift console and click **`rhbk`** on the login screen
+2. Log in with one of the Keycloak users above
+
+### First-time RHOAI setup per user
+After logging into OpenShift AI, the dashboard defaults to the last active project.
+**Before creating a playground**, switch to your personal namespace:
+
+- `user1` → select project **`wksp-user1`**
+- `user2` → select project **`wksp-user2`**
+
+Then navigate to GenAI Studio and create the playground. Creating it in any other
+namespace (e.g. `grafana`, `default`) will fail with a permission error because
+users only have `edit` access in their own `wksp-<username>` namespace.
+
 ## Manual Secrets Required Before Redeployment
 
 Two secrets contain sensitive credentials that must NOT be committed to git.
