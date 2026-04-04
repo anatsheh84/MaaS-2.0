@@ -162,7 +162,34 @@ oc create secret generic slack-mcp-token -n lls-demo \
 
 ## Redeployment Procedure
 
-On a fresh cluster (same GUID/infraID) the only manual steps are:
+### Step 1 — Update `bootstrap/values.yaml`
+
+This is the **only file** you need to change between clusters. All charts and
+Applications derive their configuration from it — nothing else is hardcoded.
+
+**Must update on every new cluster:**
+
+| Value | How to get it |
+|-------|--------------|
+| `cluster.infraID` | `oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}'` |
+| `cluster.apiUrl` | New cluster API URL |
+| `cluster.apiDomain` | `api.<new-cluster-domain>` |
+| `cluster.domain` | `apps.<new-cluster-domain>` |
+| `deployer.domain` | Same as `cluster.domain` |
+| `aws.ami` | `oc get machineset -n openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.ami.id}'` |
+| `aws.guid` | RHPDS sandbox GUID |
+| `aws.uuid` | `oc get machineset -n openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.tags[?(@.name=="uuid")].value}'` |
+| `certManager.route53.accessKeyID` | RHPDS sandbox AWS credentials |
+| `certManager.route53.hostedZoneID` | RHPDS sandbox AWS credentials |
+| `certManager.dnsZones` | `[apps.<new-domain>, api.<new-domain>]` |
+
+**Stays the same on every cluster:**
+
+`cluster.region`, `cluster.platform`, `aws.az`, `llmaas.repoURL`,
+`llmaas.targetRevision`, `certManager.issuerName`, `certManager.email`,
+`users.count`, `users.prefix`, `bootstrap.repoURL`, `bootstrap.targetRevision`
+
+### Step 2 — Run the deployment
 
 ```bash
 # 1. Install GitOps operator
@@ -180,8 +207,7 @@ oc apply -f setup/cluster-admin-binding.yaml
 # 4. Deploy the bootstrap Application (app-of-apps)
 oc apply -f setup/bootstrap.yaml
 
-# Everything else is GitOps-driven from this point.
-# Monitor progress:
+# Monitor progress
 oc get applications -n openshift-gitops -w
 ```
 
