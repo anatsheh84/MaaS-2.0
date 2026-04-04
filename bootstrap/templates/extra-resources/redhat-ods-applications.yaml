@@ -1,0 +1,9 @@
+# Pre-create the redhat-ods-applications namespace with cluster monitoring
+# enabled. RHOAI also creates this, but declaring it here ensures the
+# monitoring annotation is present from the start.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redhat-ods-applications
+  annotations:
+    openshift.io/cluster-monitoring: 'true'

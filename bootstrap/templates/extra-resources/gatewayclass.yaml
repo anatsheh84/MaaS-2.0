@@ -1,0 +1,9 @@
+# Required by models-as-a-service and openshift-ai-inference Gateway.
+# The OpenShift Ingress Operator does NOT create this automatically —
+# it must be explicitly declared.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: openshift-default
+spec:
+  controllerName: "openshift.io/gateway-controller/v1"

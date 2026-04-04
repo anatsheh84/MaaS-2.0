@@ -1,0 +1,35 @@
+# ConfigMap consumed by RHOAI to auto-register MCP servers in the UI.
+# Both kubernetes-mcp-server and slack-mcp-server are listed here so
+# they appear as available MCP tools in OpenShift AI workspaces.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gen-ai-aa-mcp-servers
+  namespace: redhat-ods-applications
+data:
+  Kubernetes-MCP-Server: |
+    {
+      "url": "http://ocp-mcp-server.lls-demo.svc.cluster.local:8080/mcp",
+      "description": "A powerful and flexible Kubernetes Model Context Protocol (MCP) server implementation with support for Kubernetes and OpenShift."
+    }
+  Slack-MCP-Server: |
+    {
+      "url": "http://slack-mcp-server.lls-demo.svc.cluster.local/mcp",
+      "description": "An MCP server for interacting with our workshop Slack instance."
+    }
+---
+# ClusterRoleBinding granting the kubernetes-mcp-server service account
+# cluster-wide view access so it can describe resources across namespaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ocp-mcp-cluster-view
+subjects:
+  - kind: ServiceAccount
+    name: ocp-mcp
+    namespace: lls-demo
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io

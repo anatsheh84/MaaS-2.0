@@ -1,0 +1,18 @@
+# OpenShift Groups for MaaS rate-limit tiers.
+# Users are auto-populated from bootstrap values (users.count / users.prefix).
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: tier-premium-users
+users:
+  {{- range $i := until (int .Values.users.count) }}
+  - {{ $.Values.users.prefix }}{{ add $i 1 }}
+  {{- end }}
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: tier-enterprise-users
+users:
+  - admin
