@@ -127,6 +127,25 @@ sync wave, causing a deadlock if PVC and Deployment are in different waves.
 **Fix:** PVC and Deployment are in **the same sync wave (-1)** in `postgres.yaml`.
 ArgoCD applies them together; the pod mounts the PVC; the PVC binds.
 
+## Manual Secrets Required Before Redeployment
+
+Two secrets contain sensitive credentials that must NOT be committed to git.
+Create them on the cluster **before** applying `setup/bootstrap.yaml`:
+
+```bash
+# 1. cert-manager Route53 credentials (for Let's Encrypt DNS-01 challenge)
+#    Get the secret access key from your RHPDS sandbox credentials page
+oc create secret generic cert-manager-aws-creds -n cert-manager \
+  --from-literal=aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
+
+# 2. Slack MCP bot token (for the slack-mcp Application)
+oc create secret generic slack-mcp-token -n lls-demo \
+  --from-literal=slack-bot-token=<SLACK_BOT_TOKEN>
+```
+
+> **Note:** On RHPDS sandboxes, `cert-manager-aws-creds` may already be provisioned
+> by the platform. Check `oc get secret cert-manager-aws-creds -n cert-manager` first.
+
 ## Redeployment Procedure
 
 On a fresh cluster (same GUID/infraID) the only manual steps are:

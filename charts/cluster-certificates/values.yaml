@@ -1,0 +1,19 @@
+# Values injected from bootstrap/values.yaml via the Application helm.values block.
+# The aws_secret_access_key is NOT here — it lives in a manually-created Secret:
+#   oc create secret generic cert-manager-aws-creds -n cert-manager \
+#     --from-literal=aws_secret_access_key=<your-secret-key>
+
+issuerName: letsencrypt-production-ec2
+email: rhpds-admins@redhat.com
+
+route53:
+  accessKeyID: ""
+  hostedZoneID: ""
+  region: us-east-2
+  credentialsSecretName: cert-manager-aws-creds
+
+# DNS zones covered by the issuer
+dnsZones: []
+
+# Domain for the cluster (apps.<domain> wildcard cert)
+domain: ""

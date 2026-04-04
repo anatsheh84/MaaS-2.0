@@ -1,0 +1,11 @@
+apiVersion: v2
+name: cluster-certificates
+description: >
+  Let's Encrypt wildcard TLS for the cluster via cert-manager + Route53 DNS-01.
+  Creates the ClusterIssuer, ingress wildcard cert, and patches IngressController
+  to serve the Let's Encrypt cert on all routes.
+  PREREQUISITE: 'cert-manager-aws-creds' Secret must exist in 'cert-manager'
+  namespace with key 'aws_secret_access_key' before this chart syncs.
+type: application
+version: 0.1.0
+appVersion: 0.1.0

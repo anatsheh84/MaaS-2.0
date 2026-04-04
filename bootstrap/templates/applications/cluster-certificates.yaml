@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-certificates
+  namespace: openshift-gitops
+  annotations:
+    # Wave 2 — after cert-manager operator (wave 1) is healthy.
+    # Runs alongside keycloak operator; must complete before keycloak-instance
+    # and models-as-a-service which reference cert-manager-ingress-cert.
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/cluster-certificates
+    helm:
+      values: |
+        issuerName: {{ .Values.certManager.issuerName }}
+        email: {{ .Values.certManager.email }}
+        domain: {{ .Values.cluster.domain }}
+        route53:
+          accessKeyID: {{ .Values.certManager.route53.accessKeyID }}
+          hostedZoneID: {{ .Values.certManager.route53.hostedZoneID }}
+          region: {{ .Values.certManager.route53.region }}
+          credentialsSecretName: {{ .Values.certManager.route53.credentialsSecretName }}
+        dnsZones:
+          {{- range .Values.certManager.dnsZones }}
+          - {{ . }}
+          {{- end }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

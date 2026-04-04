@@ -27,6 +27,22 @@ llmaas:
 deployer:
   domain: apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com
 
+# cert-manager ClusterIssuer config (Route53 DNS-01 for Let's Encrypt)
+# PREREQUISITE: Create the AWS secret before this chart syncs:
+#   oc create secret generic cert-manager-aws-creds -n cert-manager \
+#     --from-literal=aws_secret_access_key=<secret-from-sandbox-credentials>
+certManager:
+  issuerName: letsencrypt-production-ec2
+  email: rhpds-admins@redhat.com
+  route53:
+    accessKeyID: AKIAYNV7DGRYEZFVCAC3
+    hostedZoneID: Z05908102CC2WUA1LFPNW
+    region: us-east-2
+    credentialsSecretName: cert-manager-aws-creds
+  dnsZones:
+    - apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com
+    - api.cluster-mfm68.mfm68.sandbox2356.opentlc.com
+
 # Number of demo users to create (user1 … userN)
 users:
   count: 2

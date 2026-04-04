@@ -1,0 +1,47 @@
+---
+# Wildcard TLS certificate for all *.apps.<domain> routes.
+# Used as the default cert for the IngressController (see ingress-controller.yaml).
+# Also referenced by the maas-default-gateway as 'cert-manager-ingress-cert'.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-manager-ingress-cert
+  namespace: openshift-ingress
+spec:
+  commonName: apps.{{ .Values.domain }}
+  dnsNames:
+    - apps.{{ .Values.domain }}
+    - "*.apps.{{ .Values.domain }}"
+  duration: 2160h   # 90 days
+  renewBefore: 360h # renew 15 days before expiry
+  isCA: false
+  usages:
+    - server auth
+    - client auth
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: {{ .Values.issuerName }}
+  secretName: cert-manager-ingress-cert
+---
+# Certificate for the API server endpoint.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-manager-api-cert
+  namespace: openshift-config
+spec:
+  commonName: api.{{ .Values.domain }}
+  dnsNames:
+    - api.{{ .Values.domain }}
+  duration: 2160h
+  renewBefore: 360h
+  isCA: false
+  usages:
+    - server auth
+    - client auth
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: {{ .Values.issuerName }}
+  secretName: cert-manager-api-cert

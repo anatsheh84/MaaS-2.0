@@ -1,0 +1,13 @@
+---
+# Patch the default IngressController to use the Let's Encrypt wildcard cert.
+# This replaces the self-signed default cert on ALL OpenShift routes cluster-wide.
+# ArgoCD uses ServerSideApply so only defaultCertificate is owned here;
+# all other IngressController fields remain operator-managed.
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: default
+  namespace: openshift-ingress-operator
+spec:
+  defaultCertificate:
+    name: cert-manager-ingress-cert
