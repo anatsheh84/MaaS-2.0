@@ -193,9 +193,18 @@ The RHBK operator (v26.2) creates a service named `keycloak-service` but does **
 add the OpenShift Service CA annotation automatically. Without it, `keycloak-tls` is
 never generated and the pod fails to mount the volume.
 
-Fix is codified in `keycloak-service-patch.yaml` — ArgoCD applies a metadata-only SSA
-patch that adds `service.beta.openshift.io/serving-cert-secret-name: keycloak-tls`.
-No manual intervention needed on a fresh deploy.
+On a **fresh cluster** `keycloak-service` does not exist when the keycloak-instance
+Application first syncs (the operator only creates it after seeing the Keycloak CR).
+A metadata-only patch therefore fails with `spec.ports: Required value` because
+Kubernetes cannot create a Service without ports — blocking wave 0 (Keycloak CR)
+from ever running (deadlock).
+
+Fix: `keycloak-service-patch.yaml` pre-creates `keycloak-service` in sync-wave `-1`
+with the Service CA annotation **and** a minimal `spec.ports` (port 8443) so the
+service is valid for creation. Service CA immediately generates `keycloak-tls`.
+By the time the Keycloak pod starts in wave 0, the TLS secret already exists.
+The RHBK operator then reconciles the service and adds its own fields without
+conflict (SSA field ownership is per-field).
 
 ### 4. Keycloak Route — Service Name
 The route must point to `keycloak-service` (not `keycloak`). The `keycloak` service
