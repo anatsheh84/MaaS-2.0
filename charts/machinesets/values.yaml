@@ -1,22 +1,21 @@
 # Override these from the bootstrap Application helm values block
-infrID: ""  # Note: overridden by Application as 'infraID'; this default is never used
-amd: ""
+infraID: ""
+ami: ""
 region: us-east-2
 guid: ""
 uuid: ""
 
 # Worker MachineSets
-# Cluster installed single-AZ — only us-east-2c has VPC private subnets.
-# All 5 workers consolidated here. If multi-AZ subnets are added later,
-# split this into 3 entries (1/2/2) matching the MaaS reference topology.
+# az is injected by the bootstrap Application from aws.az (auto-detected by configure.sh).
+# Do NOT hardcode an AZ here — it varies per RHPDS cluster.
 workers:
-  - az: us-east-2c
+  - az: ""
     replicas: 5
 
 # GPU MachineSet — g6e.2xlarge with NVIDIA L40S (46GB VRAM)
 # Taint: nvidia.com/gpu=l40-gpu:NoSchedule
 gpu:
-  az: us-east-2c
+  az: ""
   replicas: 1
   instanceType: g6e.2xlarge
   volumeSize: 250

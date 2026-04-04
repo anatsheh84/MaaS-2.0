@@ -18,6 +18,14 @@ spec:
         region: {{ .Values.cluster.region }}
         guid: {{ .Values.aws.guid }}
         uuid: "{{ .Values.aws.uuid }}"
+        workers:
+          - az: {{ .Values.aws.az }}
+            replicas: 5
+        gpu:
+          az: {{ .Values.aws.az }}
+          replicas: 1
+          instanceType: g6e.2xlarge
+          volumeSize: 250
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-machine-api
