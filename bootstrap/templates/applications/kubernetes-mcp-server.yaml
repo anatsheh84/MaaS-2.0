@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubernetes-mcp-server
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # OCI Helm chart from ghcr.io/containers/charts/kubernetes-mcp-server
+    # Values (openshift: true, fullnameOverride, RBAC) from llmaas-multitenant
+    - repoURL: oci://ghcr.io/containers/charts/kubernetes-mcp-server
+      targetRevision: 0.1.0
+      path: .
+      helm:
+        valueFiles:
+          - $values/deployments/kubernetes-mcp-server/values.yaml
+    - repoURL: {{ .Values.llmaas.repoURL }}
+      targetRevision: {{ .Values.llmaas.targetRevision }}
+      ref: values
+  destination:
+    name: in-cluster
+    namespace: lls-demo
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true

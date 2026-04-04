@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openshift-ai-operator
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Chart from jharmison-redhat/openshift-setup @ ce78b89
+    # Values (operator channel, CSV, namespace) from llmaas-multitenant
+    - repoURL: https://github.com/jharmison-redhat/openshift-setup
+      targetRevision: ce78b89b3e1eee5554aa1198f72f8ff50e5adcd8
+      path: charts/install-operators
+      helm:
+        valueFiles:
+          - $values/deployments/openshift-ai-operator/values.yaml
+    - repoURL: {{ .Values.llmaas.repoURL }}
+      targetRevision: {{ .Values.llmaas.targetRevision }}
+      ref: values
+  destination:
+    name: in-cluster
+    namespace: redhat-ods-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    managedNamespaceMetadata:
+      annotations:
+        openshift.io/cluster-monitoring: 'true'
+      labels:
+        argocd.argoproj.io/managed-by: openshift-gitops

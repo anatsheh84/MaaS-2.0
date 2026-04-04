@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: models
+  namespace: openshift-gitops
+  annotations:
+    # Wave 6 — after OpenShift AI operand (wave 5) is healthy
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.llmaas.repoURL }}
+    targetRevision: {{ .Values.llmaas.targetRevision }}
+    path: deployments/models
+  destination:
+    name: in-cluster
+    namespace: llm
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

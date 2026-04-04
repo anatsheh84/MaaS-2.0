@@ -14,5 +14,28 @@ aws:
   ami: ami-021a620474c1cd2fe
   guid: mfm68
   uuid: "2aa7ec64-e90d-591f-81be-ed049ef053e2"
-  # Cluster was installed single-AZ; only us-east-2c has VPC subnets
+  # Cluster installed single-AZ; only us-east-2c has VPC private subnets
   az: us-east-2c
+
+# Reference to the upstream MaaS chart repo (rhpds/private-llmaas-multitenant)
+# Applications from Phase 4 point here for their source charts/deployments
+llmaas:
+  repoURL: https://github.com/rhpds/private-llmaas-multitenant
+  targetRevision: v1.2.0
+
+# Cluster-facing domain used in routes, gateways, and per-user URLs
+deployer:
+  domain: apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com
+
+# Number of demo users to create (user1 … userN)
+users:
+  count: 2
+  prefix: user
+
+# Slack MCP bot token
+# DO NOT store the real token here. Create the secret manually on the cluster:
+#   oc create secret generic slack-mcp-token -n lls-demo \
+#     --from-literal=botToken=xoxb-your-real-token
+# Then reference it via the slack-mcp chart's existingSecret field.
+slack:
+  botToken: "REPLACE_ME_DO_NOT_COMMIT"

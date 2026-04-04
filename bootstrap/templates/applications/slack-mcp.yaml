@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: slack-mcp
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.llmaas.repoURL }}
+    targetRevision: {{ .Values.llmaas.targetRevision }}
+    path: deployments/slack-mcp
+    helm:
+      # Token is NOT stored in git — create the secret on the cluster first:
+      #   oc create secret generic slack-mcp-token -n lls-demo \
+      #     --from-literal=slack-bot-token=xoxb-your-real-token
+      # The chart picks it up via slack.existingSecret; no secret is created by Helm.
+      valuesObject:
+        slack:
+          existingSecret: slack-mcp-token
+  destination:
+    name: in-cluster
+    namespace: lls-demo
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openshift-ai
+  namespace: openshift-gitops
+  annotations:
+    # Wave 5 — after openshift-ai-operator (wave 4) is healthy
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Chart from jharmison-redhat/openshift-setup @ a751243
+    # Values (DataScienceCluster components) from llmaas-multitenant
+    - repoURL: https://github.com/jharmison-redhat/openshift-setup
+      targetRevision: a751243da77b5fc15dff12c6bba4f8990783a06d
+      path: charts/openshift-ai
+      helm:
+        valueFiles:
+          - $values/deployments/openshift-ai/values.yaml
+    - repoURL: {{ .Values.llmaas.repoURL }}
+      targetRevision: {{ .Values.llmaas.targetRevision }}
+      ref: values
+  destination:
+    name: in-cluster
+    namespace: redhat-ods-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
