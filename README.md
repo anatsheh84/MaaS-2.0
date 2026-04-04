@@ -180,10 +180,13 @@ a spec change after initial deploy:
 oc patch argocd openshift-gitops -n openshift-gitops --type merge -p '{"spec": {...}}'
 ```
 
-### 2. MachineSets — Single-AZ only
-The VPC is provisioned with private subnets only in `us-east-2c`. Attempting to create
-MachineSets in `us-east-2a`/`us-east-2b` fails with *"no subnet IDs were found"*.
-All 5 workers + GPU node are in `us-east-2c`.
+### 2. MachineSets — AZ is auto-detected, not hardcoded
+`configure.sh` reads the AZ from the cluster's existing MachineSet at deploy time and
+injects it into ArgoCD via `helm.valuesObject`. The machineset chart templates use this
+value for all MachineSets (workers and GPU). No manual AZ configuration is needed.
+
+If the cluster has subnets only in a specific AZ (common on RHPDS sandboxes), all
+MachineSets will be placed in that AZ automatically.
 
 ### 3. Keycloak — Service CA TLS
 The RHBK operator (v26.2) creates a service named `keycloak-service` but does **not**

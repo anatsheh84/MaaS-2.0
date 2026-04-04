@@ -25,7 +25,7 @@ aws:
   ami: ""
   guid: ""
   uuid: ""
-  az: us-east-2c        # RHPDS single-AZ — only us-east-2c has subnets
+  az: ""                # auto-detected by configure.sh — do NOT hardcode
 
 deployer:
   domain: ""            # same as cluster.domain
