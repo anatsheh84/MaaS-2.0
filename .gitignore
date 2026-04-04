@@ -1,0 +1,8 @@
+# MaaS 2.0 — Git ignore
+# ─────────────────────────────────────────────────────────────────────────────
+# Local values file — written by configure.sh, NEVER committed.
+# Contains cluster-specific values and credentials for the current deployment.
+bootstrap/values.local.yaml
+
+# Backup files created by configure.sh
+*.bak

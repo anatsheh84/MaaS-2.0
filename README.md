@@ -112,18 +112,11 @@ users only have `edit` access in their own `wksp-<username>` namespace.
 
 ### Prerequisites
 
-- `oc` CLI installed
-- `yq` installed — `brew install yq`
-- Logged into your local machine with the repo cloned at the right location
-- RHPDS sandbox credentials (API URL, kubeadmin password, AWS access key, AWS secret key, hosted zone ID)
+- `oc` CLI installed and in PATH
+- Run from the root of the cloned repo
+- RHPDS sandbox credentials ready (API URL, kubeadmin password, AWS access key, AWS secret key, hosted zone ID)
 
-### Step 1 — Run configure.sh
-
-`setup/configure.sh` does everything for you automatically:
-- Logs into the cluster
-- Reads all cluster-specific values (`infraID`, `AMI`, `domain`, `uuid`, `guid`, `region`, `az`)
-- Updates `bootstrap/values.yaml` in place
-- Creates the `cert-manager-aws-creds` secret on the cluster
+### One command does everything
 
 ```bash
 ./setup/configure.sh \
@@ -134,54 +127,35 @@ users only have `edit` access in their own `wksp-<username>` namespace.
   <HOSTED_ZONE_ID>
 ```
 
-The script will print a summary of everything it changed and the exact next steps to run.
+**That's it. No git commit needed.**
 
-> The AWS credentials and Hosted Zone ID come from the **RHPDS sandbox credentials page**
-> for your environment. The `cert-manager-aws-creds` secret it creates is the one
-> pre-requisite that cannot be committed to git.
+The script handles the full deployment end-to-end:
 
-### Step 2 — Commit and push
+| Step | What happens |
+|------|-------------|
+| 1 | Logs into the cluster |
+| 2 | Reads all cluster values via `oc` (infraID, AMI, domain, uuid, guid, region, az) |
+| 3 | Writes real values to `bootstrap/values.local.yaml` — gitignored, never committed |
+| 4 | Creates `cert-manager-aws-creds` secret on the cluster |
+| 5 | Installs OpenShift GitOps operator, grants ArgoCD cluster-admin, deploys bootstrap Application |
+| 6 | Patches the ArgoCD bootstrap Application's `helm.valuesObject` with real values so ArgoCD renders all templates correctly — **without touching git** |
+
+> **Why no git commit?**
+> `bootstrap/values.yaml` in git is a pure template with empty placeholders.
+> Real cluster values are injected directly into the live ArgoCD Application via
+> `helm.valuesObject` — they never leave your cluster or appear in the repo.
+
+### After the script completes
+
+ArgoCD automatically deploys everything in sync-wave order. Monitor progress:
 
 ```bash
-git add bootstrap/values.yaml
-git commit -m "config: update values for new cluster"
-git push
-```
-
-### Step 3 — Deploy
-
-```bash
-# Install GitOps operator
-oc apply -f setup/gitops-subscription.yaml
-
-# Wait for it to be ready (~2 min)
-oc wait csv -n openshift-gitops \
-  --for=jsonpath='{.status.phase}'=Succeeded \
-  -l operators.coreos.com/openshift-gitops-operator.openshift-gitops \
-  --timeout=300s
-
-# Grant ArgoCD cluster-admin
-oc apply -f setup/cluster-admin-binding.yaml
-
-# Deploy the bootstrap Application — kicks off all GitOps
-oc apply -f setup/bootstrap.yaml
-
-# Monitor progress
 oc get applications -n openshift-gitops -w
 ```
 
-ArgoCD will automatically deploy everything — nodes provision, operators install,
-Keycloak configures, RHOAI deploys, and the full MaaS stack comes up.
-
-### Manual secrets (only if configure.sh could not create them)
+One manual step remains — the Slack bot token cannot be automated:
 
 ```bash
-# cert-manager Route53 secret — should already exist after configure.sh
-# Only needed if you skipped the script or the namespace didn't exist yet
-oc create secret generic cert-manager-aws-creds -n cert-manager \
-  --from-literal=aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
-
-# Slack MCP bot token — always manual, never in git
 oc create secret generic slack-mcp-token -n lls-demo \
   --from-literal=slack-bot-token=<SLACK_BOT_TOKEN>
 ```
