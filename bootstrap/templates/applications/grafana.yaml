@@ -31,3 +31,11 @@ spec:
       name: grafana-proxy
       jsonPointers:
         - /data/session_secret
+    # grafana-all-login gives view to system:authenticated:oauth (everyone),
+    # which pollutes the RHOAI project picker for regular users.
+    # We patch it to tier-premium-users only — ignore drift so ArgoCD
+    # doesn't revert back to system:authenticated:oauth.
+    - kind: RoleBinding
+      name: grafana-all-login
+      jsonPointers:
+        - /subjects
