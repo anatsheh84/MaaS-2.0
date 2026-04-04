@@ -9,9 +9,9 @@ metadata:
 spec:
   host: sso.{{ .Values.domain }}
   port:
-    targetPort: https
+    targetPort: http
   tls:
-    termination: reencrypt
+    termination: edge
     insecureEdgeTerminationPolicy: Redirect
   to:
     kind: Service

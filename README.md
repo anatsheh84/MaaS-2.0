@@ -188,23 +188,26 @@ value for all MachineSets (workers and GPU). No manual AZ configuration is neede
 If the cluster has subnets only in a specific AZ (common on RHPDS sandboxes), all
 MachineSets will be placed in that AZ automatically.
 
-### 3. Keycloak — Service CA TLS
-The RHBK operator (v26.2) creates a service named `keycloak-service` but does **not**
-add the OpenShift Service CA annotation automatically. Without it, `keycloak-tls` is
-never generated and the pod fails to mount the volume.
+### 3. Keycloak — TLS handled at the Route, not the pod
+The RHBK operator fully owns `keycloak-service`. Any attempt to patch or
+pre-create that service (e.g. to add a Service CA annotation) creates SSA
+field-ownership conflicts with the operator's reconcile loop.
 
-On a **fresh cluster** `keycloak-service` does not exist when the keycloak-instance
-Application first syncs (the operator only creates it after seeing the Keycloak CR).
-A metadata-only patch therefore fails with `spec.ports: Required value` because
-Kubernetes cannot create a Service without ports — blocking wave 0 (Keycloak CR)
-from ever running (deadlock).
+**Design:** TLS is terminated at the OpenShift router (edge termination) using
+the cluster's wildcard Let's Encrypt cert — not at the Keycloak pod. The Keycloak
+CR uses `httpEnabled: true` so the pod serves plain HTTP internally. The Route
+handles HTTPS and HTTP→HTTPS redirect. `keycloak-tls` is not needed and
+`keycloak-service` is never touched by ArgoCD.
 
-Fix: `keycloak-service-patch.yaml` pre-creates `keycloak-service` in sync-wave `-1`
-with the Service CA annotation **and** a minimal `spec.ports` (port 8443) so the
-service is valid for creation. Service CA immediately generates `keycloak-tls`.
-By the time the Keycloak pod starts in wave 0, the TLS secret already exists.
-The RHBK operator then reconciles the service and adds its own fields without
-conflict (SSA field ownership is per-field).
+**Boundary:**
+| Resource | Owner |
+|---|---|
+| `keycloak-service` | RHBK operator — ArgoCD does NOT touch this |
+| `Keycloak` CR | ArgoCD (intent only — operator acts on it) |
+| Route | ArgoCD |
+| PostgreSQL | ArgoCD |
+| Realm import | ArgoCD |
+| OCP OAuth | ArgoCD |
 
 ### 4. Keycloak Route — Service Name
 The route must point to `keycloak-service` (not `keycloak`). The `keycloak` service

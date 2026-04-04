@@ -23,8 +23,7 @@ spec:
     strict: false
     strictBackchannel: false
   http:
-    httpEnabled: false
-    tlsSecret: keycloak-tls
+    httpEnabled: true
   ingress:
     enabled: false
   transaction:
