@@ -1,14 +1,12 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: servicemesh-operator
+  name: rhcl-installplan-approver
   namespace: openshift-gitops
   annotations:
-    # Wave 3 — before rhcl-operator (wave 4).
-    # Kuadrant requires servicemeshoperator3 as a dependency. Without an
-    # explicit Automatic subscription, OLM auto-creates one with Manual
-    # approval, blocking the combined install plan on every fresh cluster.
-    argocd.argoproj.io/sync-wave: "3"
+    # Wave 4 — same wave as rhcl-operator so the approver Job is ready
+    # the moment OLM creates the combined install plan.
+    argocd.argoproj.io/sync-wave: "4"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -16,7 +14,7 @@ spec:
   source:
     repoURL: {{ .Values.bootstrap.repoURL }}
     targetRevision: {{ .Values.bootstrap.targetRevision }}
-    path: charts/servicemesh-operator
+    path: charts/rhcl-installplan-approver
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-operators

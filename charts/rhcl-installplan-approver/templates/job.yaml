@@ -1,0 +1,71 @@
+---
+# Approves the OLM install plan that contains rhcl-operator.
+#
+# Why this is needed:
+#   OpenShift pre-installs the servicemeshoperator3 subscription with
+#   installPlanApproval: Manual (owned by OpenShift, cannot be changed).
+#   When rhcl-operator is subscribed, OLM bundles both into one combined
+#   install plan. Since one subscription is Manual, the plan blocks.
+#   This Job finds and approves it so Kuadrant CRDs install automatically.
+#
+# Behaviour:
+#   - Retries for up to 10 minutes (60 x 10s) waiting for the plan to appear
+#   - Only approves plans that contain 'rhcl-operator' in their CSV list
+#   - Exits 0 if already approved (idempotent)
+#   - argocd hook: BeforeHookCreation ensures a fresh Job on every sync
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: approve-rhcl-installplan
+  namespace: openshift-operators
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 660
+  template:
+    spec:
+      serviceAccountName: rhcl-installplan-approver
+      restartPolicy: OnFailure
+      containers:
+      - name: approver
+        image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          echo "Watching for a pending rhcl-operator install plan..."
+          for i in $(seq 1 60); do
+            PLAN=$(oc get installplan -n openshift-operators -o json 2>/dev/null | \
+              python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for p in data.get('items', []):
+    csvs = p.get('spec', {}).get('clusterServiceVersionNames', [])
+    approved = p.get('spec', {}).get('approved', True)
+    if any('rhcl-operator' in c for c in csvs) and not approved:
+        print(p['metadata']['name'])
+        break
+" 2>/dev/null || true)
+            if [ -n "$PLAN" ]; then
+              echo "Found pending plan: $PLAN — approving..."
+              oc patch installplan "$PLAN" -n openshift-operators \
+                --type=merge -p '{"spec":{"approved":true}}'
+              echo "Approved successfully."
+              exit 0
+            fi
+            # Check if already installed (plan was previously approved)
+            STATE=$(oc get subscription rhcl-operator -n openshift-operators \
+              -o jsonpath='{.status.state}' 2>/dev/null || true)
+            if [ "$STATE" = "AtLatestKnown" ]; then
+              echo "rhcl-operator already at latest known version — nothing to approve."
+              exit 0
+            fi
+            echo "Attempt $i/60: no pending plan yet, retrying in 10s..."
+            sleep 10
+          done
+          echo "WARNING: timed out waiting for rhcl-operator install plan."
+          exit 1
