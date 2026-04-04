@@ -27,11 +27,8 @@ setup/              ← One-time manual bootstrap manifests (run once, not GitOp
 
 | Parameter | Value |
 |-----------|-------|
-| InfraID | `cluster-mfm68-hsq8s` |
-| Domain | `apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com` |
 | Region | `us-east-2` |
 | AZ | `us-east-2c` (single-AZ — only zone with VPC subnets) |
-| AMI | `ami-021a620474c1cd2fe` |
 
 ## Node Topology
 
@@ -46,7 +43,7 @@ setup/              ← One-time manual bootstrap manifests (run once, not GitOp
 
 ## ArgoCD
 
-**UI:** `https://openshift-gitops-server-openshift-gitops.apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com`
+**UI:** `https://openshift-gitops-server-openshift-gitops.apps.<cluster-domain>`
 
 **Login:** Use the `kubeadmin` password or the `admin` OpenShift user.
 
@@ -63,18 +60,18 @@ setup/              ← One-time manual bootstrap manifests (run once, not GitOp
 
 | Item | Value |
 |------|-------|
-| URL | `https://sso.apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com` |
+| URL | `https://sso.apps.<cluster-domain>` |
 | Realm | `sso` |
 | OIDC client | `idp-4-ocp` |
 | OCP OAuth provider | `rhbk` |
 
 **Users** (same as MaaS reference):
 
-| Username | Password | Role |
-|----------|----------|------|
-| `user1` | `MTkxNDU3` | user |
-| `user2` | `MTkxNDU3` | user |
-| `admin` | `NDcxOTE3` | admin |
+| Username | Role |
+|----------|------|
+| `user1` | user |
+| `user2` | user |
+| `admin` | admin |
 
 ## Known Operational Notes (Lessons Learned)
 
@@ -131,7 +128,7 @@ ArgoCD applies them together; the pod mounts the PVC; the PVC binds.
 
 ### Logging in
 1. Go to the OpenShift console and click **`rhbk`** on the login screen
-2. Log in with one of the Keycloak users above
+2. Log in with your Keycloak credentials (user1, user2, or admin)
 
 ### First-time RHOAI setup per user
 After logging into OpenShift AI, the dashboard defaults to the last active project.
@@ -192,6 +189,3 @@ ArgoCD will automatically:
 - Create MachineSets → nodes provision (~10 min)
 - Install cert-manager and Keycloak operators
 - Deploy Keycloak (postgres → Keycloak CR → realm import → route → OCP OAuth)
-
-The ArgoCD UI will be available at:
-`https://openshift-gitops-server-openshift-gitops.apps.<cluster-domain>`
