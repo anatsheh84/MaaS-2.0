@@ -17,3 +17,5 @@ dnsZones: []
 
 # Domain for the cluster (apps.<domain> wildcard cert)
 domain: ""
+# Full API server hostname (api.<cluster>...)
+apiDomain: ""

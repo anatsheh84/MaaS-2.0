@@ -8,10 +8,12 @@ metadata:
   name: cert-manager-ingress-cert
   namespace: openshift-ingress
 spec:
-  commonName: apps.{{ .Values.domain }}
+  # .Values.domain IS already the apps subdomain (e.g. apps.cluster-xxx...)
+  # DO NOT prefix with 'apps.' — that would create apps.apps.cluster-xxx...
+  commonName: {{ .Values.domain }}
   dnsNames:
-    - apps.{{ .Values.domain }}
-    - "*.apps.{{ .Values.domain }}"
+    - {{ .Values.domain }}
+    - "*.{{ .Values.domain }}"
   duration: 2160h   # 90 days
   renewBefore: 360h # renew 15 days before expiry
   isCA: false
@@ -31,9 +33,10 @@ metadata:
   name: cert-manager-api-cert
   namespace: openshift-config
 spec:
-  commonName: api.{{ .Values.domain }}
+  # apiDomain is the full API hostname: api.cluster-xxx...
+  commonName: {{ .Values.apiDomain }}
   dnsNames:
-    - api.{{ .Values.domain }}
+    - {{ .Values.apiDomain }}
   duration: 2160h
   renewBefore: 360h
   isCA: false

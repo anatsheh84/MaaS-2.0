@@ -6,6 +6,7 @@ bootstrap:
 cluster:
   infraID: cluster-mfm68-hsq8s
   apiUrl: https://api.cluster-mfm68.mfm68.sandbox2356.opentlc.com:6443
+  apiDomain: api.cluster-mfm68.mfm68.sandbox2356.opentlc.com
   domain: apps.cluster-mfm68.mfm68.sandbox2356.opentlc.com
   region: us-east-2
   platform: AWS
