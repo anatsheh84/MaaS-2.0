@@ -34,6 +34,16 @@ spec:
         args:
         - |
           set -euo pipefail
+
+          # Exit immediately if rhcl-operator is already fully installed.
+          # This covers re-deploys and clusters where Kuadrant was pre-installed.
+          STATE=$(oc get subscription rhcl-operator -n openshift-operators \
+            -o jsonpath='{.status.state}' 2>/dev/null || true)
+          if [ "$STATE" = "AtLatestKnown" ]; then
+            echo "rhcl-operator is AtLatestKnown - already installed, nothing to do."
+            exit 0
+          fi
+
           echo "Watching for a pending rhcl-operator install plan..."
           for i in $(seq 1 60); do
             PLAN=$(oc get installplan -n openshift-operators -o json 2>/dev/null \
@@ -51,10 +61,11 @@ spec:
               echo "Approved successfully."
               exit 0
             fi
+            # Re-check state in case it became AtLatestKnown during retry loop
             STATE=$(oc get subscription rhcl-operator -n openshift-operators \
               -o jsonpath='{.status.state}' 2>/dev/null || true)
             if [ "$STATE" = "AtLatestKnown" ]; then
-              echo "rhcl-operator already at latest known - nothing to approve."
+              echo "rhcl-operator reached AtLatestKnown - install plan was approved externally."
               exit 0
             fi
             echo "Attempt $i/60: no pending plan yet, retrying in 10s..."
