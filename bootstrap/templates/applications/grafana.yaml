@@ -23,9 +23,6 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - RespectIgnoreDifferences=true
-    managedNamespaceMetadata:
-      labels:
-        argocd.argoproj.io/managed-by: openshift-gitops
   ignoreDifferences:
     - kind: Secret
       name: grafana-proxy
