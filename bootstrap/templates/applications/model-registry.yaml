@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: model-registry
+  namespace: openshift-gitops
+  annotations:
+    # Wave 6 — after openshift-ai (wave 5) has deployed the ModelRegistry operator component
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/model-registry
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-llmaas.yaml
+  destination:
+    name: in-cluster
+    namespace: rhoai-model-registries
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,24 @@
+{{- range .Values.modelRegistries }}
+---
+apiVersion: modelregistry.opendatahub.io/v1alpha1
+kind: ModelRegistry
+metadata:
+  name: {{ .name }}
+  namespace: rhoai-model-registries
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  rest:
+    port: 8080
+    serviceRoute: enabled
+  grpc:
+    port: 9090
+  postgres:
+    generateDeployment: true
+    database: model_registry
+    username: mlmduser
+    passwordSecret:
+      name: {{ .name }}-db-secret
+      key: database-password
+    skipDBCreation: false
+{{- end }}

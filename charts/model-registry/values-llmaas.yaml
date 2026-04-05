@@ -1,0 +1,3 @@
+modelRegistries:
+  - name: maas-registry
+    dbPassword: maas-registry-db-2024

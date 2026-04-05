@@ -1,0 +1,7 @@
+# Model Registry instances
+# Each entry creates a ModelRegistry CR + its backing Postgres Secret
+# The ModelRegistry operator (part of RHOAI) provisions Postgres automatically.
+modelRegistries: []
+# Example:
+# - name: maas-registry
+#   dbPassword: changeme
