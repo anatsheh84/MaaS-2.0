@@ -45,10 +45,12 @@ hardwareProfiles:
         maxCount: 48Gi
         defaultCount: 32Gi
     scheduling:
-      nodeSelector:
-        nvidia.com/gpu.present: "true"
-      tolerations:
-        - key: nvidia.com/gpu
-          operator: Equal
-          value: l40-gpu
-          effect: NoSchedule
+      type: Node
+      node:
+        nodeSelector:
+          nvidia.com/gpu.present: "true"
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Equal
+            value: l40-gpu
+            effect: NoSchedule
