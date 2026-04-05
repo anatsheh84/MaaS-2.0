@@ -72,3 +72,27 @@ models:
         key: nvidia.com/gpu
         operator: Equal
         value: l40-gpu
+
+  - name: phi-4-instruct-w8a8
+    displayName: Phi-4 Instruct W8A8
+    uri: oci://registry.redhat.io/rhelai1/modelcar-phi-4-quantized-w8a8:1.5
+    hardwareProfile: nvidia-l40s-single-gpu
+    resources:
+      limits:
+        cpu: "6"
+        memory: 32Gi
+        nvidia.com/gpu: "1"
+      requests:
+        cpu: "4"
+        memory: 24Gi
+        nvidia.com/gpu: "1"
+    extraArgs:
+      - --enable-auto-tool-choice
+      - --tool-call-parser=hermes
+      - --gpu-memory-utilization=0.95
+      - --max-model-len=16384
+    tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Equal
+        value: l40-gpu
