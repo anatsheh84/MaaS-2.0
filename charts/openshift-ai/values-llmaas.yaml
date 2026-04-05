@@ -18,3 +18,37 @@ dashboardConfig:
 modelServerSizes: null
 
 notebookSizes: null
+
+# Hardware profiles for model serving
+# These appear in the RHOAI dashboard when deploying models — replaces "Custom"
+hardwareProfiles:
+  - name: nvidia-l40s-single-gpu
+    displayName: "NVIDIA L40S — 1 GPU (g6e.2xlarge)"
+    global: true
+    identifiers:
+      - displayName: GPU
+        identifier: nvidia.com/gpu
+        resourceType: Accelerator
+        minCount: 1
+        maxCount: 1
+        defaultCount: 1
+      - displayName: CPU
+        identifier: cpu
+        resourceType: CPU
+        minCount: 1
+        maxCount: 6
+        defaultCount: 4
+      - displayName: Memory
+        identifier: memory
+        resourceType: Memory
+        minCount: 1Gi
+        maxCount: 48Gi
+        defaultCount: 32Gi
+    scheduling:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: l40-gpu
+          effect: NoSchedule

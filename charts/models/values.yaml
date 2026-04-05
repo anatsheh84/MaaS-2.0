@@ -4,6 +4,7 @@ models:
   - name: qwen3-4b-instruct
     displayName: Qwen3 4B Instruct 2507
     uri: oci://quay.io/jharmison/models:qwen--qwen3-4b-instruct-2507-modelcar
+    hardwareProfile: nvidia-l40s-single-gpu
     resources:
       limits:
         cpu: "6"

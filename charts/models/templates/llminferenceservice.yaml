@@ -6,6 +6,9 @@ metadata:
   annotations:
     alpha.maas.opendatahub.io/tiers: '["free", "premium", "enterprise"]'
     openshift.io/display-name: {{ .displayName }}
+    {{- if .hardwareProfile }}
+    alpha.kubeflow.org/hardware-profile-name: {{ .hardwareProfile }}
+    {{- end }}
   labels:
     opendatahub.io/dashboard: "true"
     opendatahub.io/genai-asset: "true"
