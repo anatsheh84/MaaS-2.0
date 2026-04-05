@@ -27,3 +27,14 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  # The ModelRegistry operator injects specDefaults into the spec after creation.
+  # This is operator-managed metadata — ignore it to prevent a permanent OutOfSync loop.
+  ignoreDifferences:
+    - group: modelregistry.opendatahub.io
+      kind: ModelRegistry
+      jsonPointers:
+        - /spec/rest/image
+        - /spec/rest/resources
+        - /spec/grpc/image
+        - /spec/postgres/image
+        - /status

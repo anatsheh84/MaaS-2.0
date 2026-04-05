@@ -27,4 +27,5 @@ spec:
       name: {{ include "model-registry.postgresSecretName" .name }}
       key: database-password
     skipDBCreation: false
+    sslMode: disable
 {{- end }}
