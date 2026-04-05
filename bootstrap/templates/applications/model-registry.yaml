@@ -28,8 +28,11 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - RespectIgnoreDifferences=true
-  # The ModelRegistry operator injects image/resource defaults into spec after creation.
-  # Ignore these operator-managed fields to prevent a permanent OutOfSync loop.
+      - ServerSideApply=true
+  # The ModelRegistry operator injects image/resource defaults and status fields.
+  # ServerSideApply=true prevents last-applied-configuration annotation from being written,
+  # avoiding drift caused by operator-owned status fields captured in that annotation.
+  # These jsonPointers cover any remaining operator-injected spec fields.
   ignoreDifferences:
     - group: modelregistry.opendatahub.io
       kind: ModelRegistry
@@ -38,4 +41,4 @@ spec:
         - /spec/rest/resources
         - /spec/grpc/image
         - /spec/postgres/image
-        - /metadata/annotations/argocd.argoproj.io~1sync-wave
+        - /status
