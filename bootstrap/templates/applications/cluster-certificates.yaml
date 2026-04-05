@@ -21,16 +21,13 @@ spec:
         issuerName: {{ .Values.certManager.issuerName }}
         email: {{ .Values.certManager.email }}
         domain: {{ .Values.cluster.domain }}
-        apiDomain: {{ .Values.cluster.apiDomain }}
         route53:
           accessKeyID: {{ .Values.certManager.route53.accessKeyID }}
           hostedZoneID: {{ .Values.certManager.route53.hostedZoneID }}
           region: {{ .Values.certManager.route53.region }}
           credentialsSecretName: {{ .Values.certManager.route53.credentialsSecretName }}
         dnsZones:
-          {{- range .Values.certManager.dnsZones }}
-          - {{ . }}
-          {{- end }}
+          - {{ .Values.cluster.domain }}
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager

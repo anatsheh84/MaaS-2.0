@@ -91,7 +91,7 @@ step "Step 2/7 — Reading cluster values"
 
 INFRA_ID=$(oc get infrastructure cluster \
   -o jsonpath='{.status.infrastructureName}')
-API_DOMAIN=$(echo "$API_URL" | sed 's|https://||' | sed 's|:6443||')
+API_DOMAIN=$(echo "$API_URL" | sed 's|https://||' | sed 's|:6443||' | sed 's|/$||')
 APPS_DOMAIN=$(oc get ingresses.config.openshift.io cluster \
   -o jsonpath='{.spec.domain}')
 REGION=$(oc get infrastructure cluster \
@@ -153,7 +153,6 @@ certManager:
     credentialsSecretName: cert-manager-aws-creds
   dnsZones:
     - "$APPS_DOMAIN"
-    - "$API_DOMAIN"
 EOF
 
 success "bootstrap/values.local.yaml written (gitignored — safe)"
@@ -302,7 +301,7 @@ VALUES_PATCH=$(cat <<EOF
               "region": "$REGION",
               "credentialsSecretName": "cert-manager-aws-creds"
             },
-            "dnsZones": ["$APPS_DOMAIN", "$API_DOMAIN"]
+            "dnsZones": ["$APPS_DOMAIN"]
           }
         }
       }

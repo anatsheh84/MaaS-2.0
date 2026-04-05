@@ -25,26 +25,3 @@ spec:
     kind: ClusterIssuer
     name: {{ .Values.issuerName }}
   secretName: cert-manager-ingress-cert
----
-# Certificate for the API server endpoint.
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: cert-manager-api-cert
-  namespace: openshift-config
-spec:
-  # apiDomain is the full API hostname: api.cluster-xxx...
-  commonName: {{ .Values.apiDomain }}
-  dnsNames:
-    - {{ .Values.apiDomain }}
-  duration: 2160h
-  renewBefore: 360h
-  isCA: false
-  usages:
-    - server auth
-    - client auth
-  issuerRef:
-    group: cert-manager.io
-    kind: ClusterIssuer
-    name: {{ .Values.issuerName }}
-  secretName: cert-manager-api-cert
