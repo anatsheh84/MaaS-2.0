@@ -28,11 +28,10 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - RespectIgnoreDifferences=true
-      - ServerSideApply=true
-  # The ModelRegistry operator injects image/resource defaults and status fields.
-  # ServerSideApply=true prevents last-applied-configuration annotation from being written,
-  # avoiding drift caused by operator-owned status fields captured in that annotation.
-  # These jsonPointers cover any remaining operator-injected spec fields.
+  # The ModelRegistry operator mutates the CR after creation by injecting image/resource
+  # defaults. Ignore these operator-owned fields and the last-applied-configuration
+  # annotation (which can capture operator-injected status fields from manual applies)
+  # to prevent a permanent OutOfSync loop.
   ignoreDifferences:
     - group: modelregistry.opendatahub.io
       kind: ModelRegistry
@@ -42,3 +41,4 @@ spec:
         - /spec/grpc/image
         - /spec/postgres/image
         - /status
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
