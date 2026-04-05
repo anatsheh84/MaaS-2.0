@@ -1,7 +1,20 @@
 # Model Registry instances
-# Each entry creates a ModelRegistry CR + its backing Postgres Secret
-# The ModelRegistry operator (part of RHOAI) provisions Postgres automatically.
+# Empty by default — enable in values-llmaas.yaml
+#
+# Each entry provisions:
+#   - Postgres Secret (credentials)
+#   - Postgres PVC (gp3-csi, 10Gi by default)
+#   - Postgres Deployment
+#   - Postgres Service
+#   - ModelRegistry CR
+#
 modelRegistries: []
-# Example:
 # - name: maas-registry
 #   dbPassword: changeme
+#   dbUser: mlmduser
+#   dbName: model_registry
+#   storageSize: 10Gi
+#   storageClass: gp3-csi
+
+# Postgres image — same as model-catalog-postgres on this cluster
+postgresImage: registry.redhat.io/rhel9/postgresql-16@sha256:a8c9a313f69ab99bd8b46ce5df7cb78b00808eedd4f8da05f4654f76c14a152c

@@ -1,0 +1,23 @@
+{{- range .Values.modelRegistries }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "model-registry.postgresServiceName" .name }}
+  namespace: rhoai-model-registries
+  labels:
+    app: {{ .name }}
+    app.kubernetes.io/name: {{ include "model-registry.postgresServiceName" .name }}
+    app.kubernetes.io/part-of: {{ .name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector:
+    app: {{ .name }}
+    app.kubernetes.io/name: {{ include "model-registry.postgresServiceName" .name }}
+  ports:
+  - name: postgresql
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+{{- end }}

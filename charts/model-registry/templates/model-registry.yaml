@@ -1,24 +1,30 @@
 {{- range .Values.modelRegistries }}
 ---
+# Note: v1alpha1 is deprecated — upgrade to v1beta1 when RHOAI operator supports it
 apiVersion: modelregistry.opendatahub.io/v1alpha1
 kind: ModelRegistry
 metadata:
   name: {{ .name }}
   namespace: rhoai-model-registries
+  labels:
+    app: {{ .name }}
+    app.kubernetes.io/part-of: {{ .name }}
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "3"
 spec:
+  grpc:
+    port: 9090
   rest:
     port: 8080
     serviceRoute: enabled
-  grpc:
-    port: 9090
   postgres:
-    generateDeployment: true
-    database: model_registry
-    username: mlmduser
+    host: {{ include "model-registry.postgresServiceName" .name }}
+    port: 5432
+    database: {{ .dbName | default "model_registry" }}
+    username: {{ .dbUser | default "mlmduser" }}
     passwordSecret:
-      name: {{ .name }}-db-secret
+      name: {{ include "model-registry.postgresSecretName" .name }}
       key: database-password
     skipDBCreation: false
 {{- end }}

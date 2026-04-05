@@ -1,0 +1,20 @@
+{{- range .Values.modelRegistries }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "model-registry.postgresServiceName" .name }}
+  namespace: rhoai-model-registries
+  labels:
+    app: {{ .name }}
+    app.kubernetes.io/part-of: {{ .name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .storageSize | default "10Gi" }}
+  storageClassName: {{ .storageClass | default "gp3-csi" }}
+{{- end }}

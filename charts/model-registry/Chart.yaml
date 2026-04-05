@@ -1,8 +1,8 @@
 apiVersion: v2
 name: model-registry
 description: >
-  Helm chart to deploy OpenShift AI Model Registry instances
-  in the rhoai-model-registries namespace.
+  Deploys OpenShift AI Model Registry instances with self-contained Postgres.
+  Each entry in modelRegistries creates: Secret, PVC, Deployment, Service, ModelRegistry CR.
 type: application
 version: 0.1.0
 appVersion: 0.1.0

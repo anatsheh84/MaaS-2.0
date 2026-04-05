@@ -1,3 +1,7 @@
 modelRegistries:
   - name: maas-registry
     dbPassword: maas-registry-db-2024
+    dbUser: mlmduser
+    dbName: model_registry
+    storageSize: 10Gi
+    storageClass: gp3-csi

@@ -1,0 +1,98 @@
+{{- range .Values.modelRegistries }}
+{{- $name := .name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "model-registry.postgresServiceName" $name }}
+  namespace: rhoai-model-registries
+  labels:
+    app: {{ $name }}
+    app.kubernetes.io/name: {{ include "model-registry.postgresServiceName" $name }}
+    app.kubernetes.io/part-of: {{ $name }}
+    component: {{ include "model-registry.postgresServiceName" $name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    template.alpha.openshift.io/wait-for-ready: "true"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      app.kubernetes.io/name: {{ include "model-registry.postgresServiceName" $name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        app.kubernetes.io/name: {{ include "model-registry.postgresServiceName" $name }}
+        component: {{ $name }}
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+      - name: postgresql
+        image: {{ $.Values.postgresImage }}
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POSTGRESQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "model-registry.postgresSecretName" $name }}
+              key: database-user
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "model-registry.postgresSecretName" $name }}
+              key: database-password
+        - name: POSTGRESQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "model-registry.postgresSecretName" $name }}
+              key: database-name
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - /usr/bin/pg_isready -U $POSTGRESQL_USER -d $POSTGRESQL_DATABASE
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+          timeoutSeconds: 2
+        readinessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - psql -w -U $POSTGRESQL_USER -d $POSTGRESQL_DATABASE -c 'SELECT 1'
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          capabilities: {}
+          privileged: false
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: {{ include "model-registry.postgresServiceName" $name }}
+{{- end }}
