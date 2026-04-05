@@ -19,6 +19,11 @@ modelServerSizes: null
 
 notebookSizes: null
 
+# Model Registry instances for MaaS
+modelRegistries:
+  - name: maas-registry
+    dbPassword: maas-registry-db-2024
+
 # Hardware profiles for model serving
 # These appear in the RHOAI dashboard when deploying models — replaces "Custom"
 hardwareProfiles:

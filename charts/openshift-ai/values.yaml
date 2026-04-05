@@ -37,32 +37,8 @@ dataScienceCluster:
 dataScienceClusterInitialization:
   serviceMesh:
     managementState: Removed
-# applicationsNamespace: redhat-ods-applications
-# monitoring:
-#   managementState: Managed
-#   namespace: redhat-ods-monitoring
-# serviceMesh:
-#   auth:
-#     audiences:
-#       - 'https://kubernetes.default.svc'
-#   controlPlane:
-#     metricsCollection: Istio
-#     name: data-science-smcp
-#     namespace: istio-system
-#   managementState: Managed
-# trustedCABundle:
-#   customCABundle: ''
-#   managementState: Managed
 
 acceleratorProfiles: []
-# - name: migrated-gpu
-#   displayName: NVIDIA GPU
-#   enabled: true
-#   identifier: nvidia.com/gpu
-#   tolerations:
-#     - effect: NoSchedule
-#       key: nvidia.com/gpu
-#       operator: Exists
 hardwareProfiles: []
 
 admins: []
@@ -70,33 +46,6 @@ userGroups:
   - system:authenticated
 
 dashboardConfig: {}
-# disableAcceleratorProfiles: false
-# disableBYONImageStream: false
-# disableClusterManager: false
-# disableCustomServingRuntimes: false
-# disableDistributedWorkloads: false
-# disableHome: false
-# disableISVBadges: false
-# disableInfo: false
-# disableKServe: false
-# disableKServeAuth: false
-# disableKServeMetrics: false
-# disableModelMesh: true
-# disableModelRegistry: false
-# disableModelServing: false
-# disablePerformanceMetrics: false
-# disablePipelines: false
-# disableProjectSharing: false
-# disableProjects: false
-# disableSupport: false
-# disableTracking: true
-# enablement: true
-# tech preview
-# disableHardwareProfiles: true
-# disableModelCatalog: true
-# #disableKueue: true
-# #disableLMEval: true
-# #disableFineTuning: true
 
 defaultWorkbenchPvcSize: 20Gi
 showJupyterInEnabledApplications: true
@@ -163,3 +112,10 @@ notebookSizes:
       requests:
         cpu: "15"
         memory: 120Gi
+
+# Model Registry instances
+# List of ModelRegistry CRs to create in rhoai-model-registries namespace
+# Empty by default — enable in values-llmaas.yaml
+modelRegistries: []
+# - name: maas-registry
+#   dbPassword: changeme
