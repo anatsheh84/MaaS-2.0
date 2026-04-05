@@ -6,7 +6,6 @@ metadata:
   namespace: openshift-ingress
   annotations:
     opendatahub.io/managed: "false"
-    security.opendatahub.io/authorino-tls-bootstrap: "true"
   labels:
     app.kubernetes.io/name: maas
     app.kubernetes.io/instance: maas-default-gateway
@@ -33,5 +32,5 @@ spec:
        certificateRefs:
        - group: ''
          kind: Secret
-         name: ${CERT_NAME}
+         name: default-ingress-cert
        mode: Terminate

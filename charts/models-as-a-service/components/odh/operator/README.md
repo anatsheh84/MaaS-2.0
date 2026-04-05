@@ -17,7 +17,7 @@ Use the provided installation script which handles all steps in the correct orde
 
 ```bash
 # From the project root
-./scripts/installers/install-odh.sh
+./deployment/scripts/installers/install-odh.sh
 ```
 
 ### Method 2: Manual Installation
@@ -87,7 +87,7 @@ This is the most common error when creating a DataScienceCluster. It occurs when
 
 **Solution**: Run the fix script:
 ```bash
-./scripts/installers/fix-odh-dsci.sh
+./deployment/scripts/installers/fix-odh-dsci.sh
 ```
 
 This script will:

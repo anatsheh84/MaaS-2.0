@@ -6,4 +6,3 @@ metadata:
 
 resources:
 - httproute.yaml
-- maas-authorino-networkpolicy.yaml
