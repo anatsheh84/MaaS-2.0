@@ -7,7 +7,8 @@ metadata:
     alpha.maas.opendatahub.io/tiers: '["free", "premium", "enterprise"]'
     openshift.io/display-name: {{ .displayName }}
     {{- if .hardwareProfile }}
-    alpha.kubeflow.org/hardware-profile-name: {{ .hardwareProfile }}
+    opendatahub.io/hardware-profile-name: {{ .hardwareProfile }}
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
     {{- end }}
   labels:
     opendatahub.io/dashboard: "true"
