@@ -21,14 +21,29 @@ spec:
         workers:
           - az: {{ .Values.aws.az }}
             replicas: 5
-        gpu:
-          az: {{ .Values.aws.az }}
-          replicas: 1
-          instanceType: g6e.2xlarge
-          volumeSize: 250
+        gpuSets:
+          - instanceType: g6e.2xlarge
+            az: {{ .Values.aws.az }}
+            replicas: 1
+            vCPU: "8"
+            volumeSize: 250
+          - instanceType: g6e.12xlarge
+            az: {{ .Values.aws.az }}
+            replicas: 0
+            vCPU: "48"
+            volumeSize: 500
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-machine-api
+  # ignoreDifferences on spec.replicas for all MachineSets so that scaling
+  # via the OpenShift GUI or 'oc scale' is not reverted by ArgoCD selfHeal.
+  # ArgoCD still owns the MachineSet definition (instance type, AZ, tags,
+  # taints, etc.) — only the replica count is left to the user/autoscaler.
+  ignoreDifferences:
+    - group: machine.openshift.io
+      kind: MachineSet
+      jsonPointers:
+        - /spec/replicas
   syncPolicy:
     automated:
       prune: true

@@ -8,14 +8,24 @@ uuid: ""
 # Worker MachineSets
 # az is injected by the bootstrap Application from aws.az (auto-detected by configure.sh).
 # Do NOT hardcode an AZ here — it varies per RHPDS cluster.
+# replicas is intentionally omitted from ignoreDifferences at the Application level
+# so the OpenShift GUI / oc scale can be used to scale workers freely.
 workers:
   - az: ""
     replicas: 5
 
-# GPU MachineSet — g6e.2xlarge with NVIDIA L40S (46GB VRAM)
-# Taint: nvidia.com/gpu=l40-gpu:NoSchedule
-gpu:
-  az: ""
-  replicas: 1
-  instanceType: g6e.2xlarge
-  volumeSize: 250
+# GPU MachineSets — list so multiple GPU instance types can coexist.
+# replicas is ignored by ArgoCD (see Application ignoreDifferences) so nodes
+# can be scaled freely from the OpenShift GUI or oc scale without being reverted.
+# Set replicas: 0 for types you want available but not running by default.
+gpuSets:
+  - instanceType: g6e.2xlarge   # NVIDIA L40S — 1 GPU, 46GB VRAM, 32 vCPU
+    az: ""
+    replicas: 1
+    vCPU: "8"
+    volumeSize: 250
+  - instanceType: g6e.12xlarge  # NVIDIA L40S — 4 GPU, 184GB VRAM, 48 vCPU
+    az: ""
+    replicas: 0
+    vCPU: "48"
+    volumeSize: 500
