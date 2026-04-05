@@ -27,8 +27,9 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-  # The ModelRegistry operator injects specDefaults into the spec after creation.
-  # This is operator-managed metadata — ignore it to prevent a permanent OutOfSync loop.
+      - RespectIgnoreDifferences=true
+  # The ModelRegistry operator injects image/resource defaults into spec after creation.
+  # Ignore these operator-managed fields to prevent a permanent OutOfSync loop.
   ignoreDifferences:
     - group: modelregistry.opendatahub.io
       kind: ModelRegistry
@@ -37,4 +38,4 @@ spec:
         - /spec/rest/resources
         - /spec/grpc/image
         - /spec/postgres/image
-        - /status
+        - /metadata/annotations/argocd.argoproj.io~1sync-wave
