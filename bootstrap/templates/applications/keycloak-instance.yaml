@@ -1,3 +1,4 @@
+{{- if .Values.keycloak.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -36,3 +37,4 @@ spec:
       jqPathExpressions:
         - .spec.tokenConfig
         - .spec.templates
+{{- end }}

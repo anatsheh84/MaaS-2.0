@@ -42,6 +42,18 @@ setup/              ← One-time manual bootstrap manifests (run once, not GitOp
 > installed single-AZ so all nodes land in us-east-2c. If multi-AZ subnets are added
 > later, update `charts/machinesets/values.yaml` to split workers across AZs.
 
+## Feature Flags
+
+`bootstrap/values.yaml` exposes flags to enable or disable optional components:
+
+| Flag | Default | Effect when `false` |
+|------|---------|---------------------|
+| `keycloak.enabled` | `false` | Skips `keycloak` (operator) and `keycloak-instance` (DB, CR, realm, OAuth). Users can only log in as `kubeadmin`. The rest of the stack is unaffected. |
+
+To re-enable Keycloak, set `keycloak.enabled: true` in `bootstrap/values.yaml` and commit.
+
+---
+
 ## ArgoCD
 
 **UI:** `https://openshift-gitops-server-openshift-gitops.apps.<cluster-domain>`

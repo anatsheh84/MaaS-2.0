@@ -40,6 +40,13 @@ certManager:
     credentialsSecretName: cert-manager-aws-creds
   dnsZones: []          # populated by configure.sh
 
+# ── Feature flags ─────────────────────────────────────────────────────────────
+# Set to false to skip deployment entirely (operator + instance both disabled).
+# The rest of the stack (RHOAI, MaaS API, Kuadrant, models) is unaffected.
+# Re-enable when multi-user login via Keycloak is needed.
+keycloak:
+  enabled: false
+
 # ── Fixed across all deployments ──────────────────────────────────────────────
 llmaas:
   repoURL: https://github.com/rhpds/private-llmaas-multitenant
