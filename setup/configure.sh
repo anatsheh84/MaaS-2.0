@@ -8,9 +8,9 @@
 #   3. Writes real values to bootstrap/values.local.yaml  ← NEVER committed
 #   4. Creates the cert-manager-aws-creds secret on the cluster
 #   5. Installs OpenShift GitOps operator and waits for it to be ready
-#   6. Grants ArgoCD cluster-admin
-#   7. Applies setup/bootstrap.yaml to create the ArgoCD bootstrap Application
-#   8. Patches the bootstrap Application's helm.valuesObject with real values
+#   5b. Creates HTPasswd identity provider with user1, user2, admin
+#   6. Grants ArgoCD cluster-admin, deploys bootstrap Application
+#   7. Patches the bootstrap Application's helm.valuesObject with real values
 #      so ArgoCD renders all templates correctly — without any git commit
 #
 # USAGE:
@@ -21,16 +21,9 @@
 #     <AWS_SECRET_ACCESS_KEY> \
 #     <HOSTED_ZONE_ID>
 #
-# EXAMPLE:
-#   ./setup/configure.sh \
-#     https://api.cluster-abc12.abc12.sandbox123.opentlc.com:6443 \
-#     myPassword123 \
-#     AKIAIOSFODNN7EXAMPLE \
-#     wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
-#     Z1234567890ABC
-#
 # PREREQUISITES:
 #   - oc CLI installed and in PATH
+#   - htpasswd (from httpd-tools / apache2-utils) installed and in PATH
 #   - Run from the root of the MaaS-2.0 repo
 # =============================================================================
 set -euo pipefail
@@ -60,11 +53,11 @@ if [[ $# -ne 5 ]]; then
   echo "    Z1234567890ABC"
   echo ""
   echo -e "${YELLOW}Where to find the values:${NC}"
-  echo "  API_URL            → RHPDS sandbox info page"
-  echo "  KUBEADMIN_PASSWORD → RHPDS sandbox info page"
-  echo "  AWS_ACCESS_KEY_ID  → RHPDS sandbox AWS credentials"
+  echo "  API_URL               → RHPDS sandbox info page"
+  echo "  KUBEADMIN_PASSWORD    → RHPDS sandbox info page"
+  echo "  AWS_ACCESS_KEY_ID     → RHPDS sandbox AWS credentials"
   echo "  AWS_SECRET_ACCESS_KEY → RHPDS sandbox AWS credentials"
-  echo "  HOSTED_ZONE_ID     → RHPDS sandbox AWS credentials"
+  echo "  HOSTED_ZONE_ID        → RHPDS sandbox AWS credentials"
   echo ""
   exit 1
 fi
@@ -87,14 +80,14 @@ echo -e "${CYAN}${BOLD}╚══════════════════
 
 
 # ── Step 1: Login ──────────────────────────────────────────────────────────────
-step "Step 1/6 — Login to cluster"
+step "Step 1/7 — Login to cluster"
 info "Logging in to: $API_URL"
 oc login "$API_URL" -u kubeadmin -p "$OC_PASSWORD" --insecure-skip-tls-verify=true \
   &>/dev/null || error "Login failed. Check API_URL and password."
 success "Logged in successfully"
 
 # ── Step 2: Read cluster values ────────────────────────────────────────────────
-step "Step 2/6 — Reading cluster values"
+step "Step 2/7 — Reading cluster values"
 
 INFRA_ID=$(oc get infrastructure cluster \
   -o jsonpath='{.status.infrastructureName}')
@@ -126,7 +119,7 @@ success "All cluster values collected"
 
 
 # ── Step 3: Write values.local.yaml (never committed) ─────────────────────────
-step "Step 3/6 — Writing bootstrap/values.local.yaml"
+step "Step 3/7 — Writing bootstrap/values.local.yaml"
 
 cat > "$LOCAL_VALUES" <<EOF
 # !! THIS FILE IS GITIGNORED — NEVER COMMIT !!
@@ -166,7 +159,7 @@ EOF
 success "bootstrap/values.local.yaml written (gitignored — safe)"
 
 # ── Step 4: Create cert-manager-aws-creds secret ──────────────────────────────
-step "Step 4/6 — Creating cert-manager-aws-creds secret"
+step "Step 4/7 — Creating cert-manager-aws-creds secret"
 oc get namespace cert-manager &>/dev/null || oc create namespace cert-manager
 if oc get secret cert-manager-aws-creds -n cert-manager &>/dev/null; then
   warn "cert-manager-aws-creds already exists — skipping"
@@ -177,8 +170,8 @@ else
 fi
 
 
-# ── Step 5: Install GitOps + bootstrap Application ────────────────────────────
-step "Step 5/6 — Installing OpenShift GitOps and deploying bootstrap"
+# ── Step 5: Install GitOps operator ───────────────────────────────────────────
+step "Step 5/7 — Installing OpenShift GitOps operator"
 
 info "Installing OpenShift GitOps operator..."
 oc apply -f "$REPO_ROOT/setup/gitops-subscription.yaml"
@@ -189,6 +182,75 @@ until oc get csv -n openshift-gitops 2>/dev/null | grep -q "Succeeded"; do
 done
 echo ""
 success "GitOps operator is ready"
+
+# ── Step 5b: Create HTPasswd users ────────────────────────────────────────────
+step "Step 5b/7 — Creating HTPasswd identity provider (user1, user2, admin)"
+#
+# Keycloak is disabled by default (see bootstrap/values.yaml).
+# We create an HTPasswd IdP directly so user1, user2 and admin exist as real
+# OpenShift identities and can access RHOAI, DevSpaces and their workspaces.
+#
+# Passwords match the values in charts/keycloak-instance/values.yaml so that
+# re-enabling Keycloak later uses the same credentials.
+#   user1  : MTkxNDU3
+#   user2  : MTkxNDU3
+#   admin  : NDcxOTE3
+#
+if command -v htpasswd &>/dev/null; then
+  HTPASSWD_FILE=$(mktemp)
+  htpasswd -bBc "$HTPASSWD_FILE" user1 MTkxNDU3
+  htpasswd -bB  "$HTPASSWD_FILE" user2 MTkxNDU3
+  htpasswd -bB  "$HTPASSWD_FILE" admin NDcxOTE3
+
+  # Create or replace the htpasswd secret in openshift-config
+  if oc get secret htpasswd-maas-users -n openshift-config &>/dev/null; then
+    oc create secret generic htpasswd-maas-users \
+      --from-file=htpasswd="$HTPASSWD_FILE" \
+      -n openshift-config \
+      --dry-run=client -o yaml | oc replace -f -
+    info "htpasswd-maas-users secret updated"
+  else
+    oc create secret generic htpasswd-maas-users \
+      --from-file=htpasswd="$HTPASSWD_FILE" \
+      -n openshift-config
+    success "htpasswd-maas-users secret created"
+  fi
+  rm -f "$HTPASSWD_FILE"
+
+  # Patch the cluster OAuth to add the HTPasswd identity provider
+  # Uses strategic merge so existing providers (e.g. kubeadmin) are preserved
+  oc patch oauth cluster --type=merge -p '{
+    "spec": {
+      "identityProviders": [{
+        "name": "htpasswd-maas",
+        "mappingMethod": "claim",
+        "type": "HTPasswd",
+        "htpasswd": {
+          "fileData": {"name": "htpasswd-maas-users"}
+        }
+      }]
+    }
+  }'
+  success "HTPasswd identity provider configured"
+  echo ""
+  echo -e "  ${CYAN}Users created:${NC}"
+  echo -e "    user1  / MTkxNDU3"
+  echo -e "    user2  / MTkxNDU3"
+  echo -e "    admin  / NDcxOTE3"
+  echo ""
+else
+  warn "'htpasswd' not found — skipping user creation."
+  warn "Install httpd-tools (RHEL/Fedora) or apache2-utils (Debian/Ubuntu)"
+  warn "then run manually:"
+  warn "  htpasswd -bBc /tmp/htpasswd user1 MTkxNDU3"
+  warn "  htpasswd -bB  /tmp/htpasswd user2 MTkxNDU3"
+  warn "  htpasswd -bB  /tmp/htpasswd admin NDcxOTE3"
+  warn "  oc create secret generic htpasswd-maas-users --from-file=htpasswd=/tmp/htpasswd -n openshift-config"
+fi
+
+
+# ── Step 6: Deploy bootstrap Application ──────────────────────────────────────
+step "Step 6/7 — Deploying ArgoCD bootstrap Application"
 
 info "Granting cluster-admin to ArgoCD..."
 oc apply -f "$REPO_ROOT/setup/cluster-admin-binding.yaml"
@@ -204,11 +266,10 @@ oc rollout status deployment/openshift-gitops-server \
   -n openshift-gitops --timeout=180s &>/dev/null || true
 sleep 5
 
-# ── Step 6: Patch bootstrap Application with real values ──────────────────────
-step "Step 6/6 — Injecting real values into ArgoCD bootstrap Application"
+# ── Step 7: Patch bootstrap Application with real values ──────────────────────
+step "Step 7/7 — Injecting real values into ArgoCD bootstrap Application"
 info "Patching helm.valuesObject — values go directly to ArgoCD, not to git"
 
-# Build the JSON patch with all cluster-specific values
 VALUES_PATCH=$(cat <<EOF
 {
   "spec": {
@@ -269,6 +330,7 @@ echo "  ✔  Collected all cluster values via oc"
 echo "  ✔  Written to bootstrap/values.local.yaml  (gitignored — never committed)"
 echo "  ✔  Created cert-manager-aws-creds secret on cluster"
 echo "  ✔  Installed OpenShift GitOps operator"
+echo "  ✔  Created HTPasswd users (user1, user2, admin)"
 echo "  ✔  Deployed bootstrap ArgoCD Application"
 echo "  ✔  Patched bootstrap with real values (no git commit needed)"
 echo ""
@@ -280,7 +342,12 @@ echo ""
 echo "  2. ArgoCD UI:"
 echo "       https://openshift-gitops-server-openshift-gitops.$APPS_DOMAIN"
 echo ""
-echo "  3. When the slack-mcp Application is deployed, create the Slack token secret:"
+echo "  3. Login to OpenShift console as:"
+echo "       user1 / MTkxNDU3   (select 'htpasswd-maas' on login screen)"
+echo "       user2 / MTkxNDU3"
+echo "       admin / NDcxOTE3"
+echo ""
+echo "  4. When the slack-mcp Application is deployed, create the Slack token secret:"
 echo "       oc create secret generic slack-mcp-token -n lls-demo \\"
 echo "         --from-literal=slack-bot-token=<YOUR_SLACK_BOT_TOKEN>"
 echo ""
