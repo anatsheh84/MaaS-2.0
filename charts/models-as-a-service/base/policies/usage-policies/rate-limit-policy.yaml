@@ -27,12 +27,3 @@ spec:
             auth.identity.tier == "premium"
       counters:
         - expression: auth.identity.userid
-    enterprise:
-      rates:
-        - limit: 50
-          window: 2m
-      when:
-        - predicate: |
-            auth.identity.tier == "enterprise"
-      counters:
-        - expression: auth.identity.userid
