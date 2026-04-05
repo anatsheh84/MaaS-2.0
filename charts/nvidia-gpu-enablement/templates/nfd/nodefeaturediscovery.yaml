@@ -1,0 +1,19 @@
+---
+apiVersion: nfd.openshift.io/v1
+kind: NodeFeatureDiscovery
+metadata:
+  name: nfd-instance
+  namespace: openshift-nfd
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  instance: ""
+  {{- with .Values.nfd.operand }}
+  operand:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  prunerOnDelete: {{ .Values.nfd.prunerOnDelete }}
+  topologyUpdater: {{ .Values.nfd.topologyUpdater }}
+  workerConfig:
+    configData: |-
+      {{- toYaml .Values.nfd.configData | nindent 6 }}

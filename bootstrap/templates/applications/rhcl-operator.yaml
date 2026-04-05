@@ -10,9 +10,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: {{ .Values.llmaas.repoURL }}
-    targetRevision: {{ .Values.llmaas.targetRevision }}
-    path: deployments/rhcl-operator
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/rhcl-operator
   destination:
     name: in-cluster
     namespace: kuadrant-system

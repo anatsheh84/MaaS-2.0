@@ -10,8 +10,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/jharmison-redhat/openshift-setup
-    targetRevision: d5030a5eee9ee5fa6558293862237593d0a069ca
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
     path: charts/nvidia-gpu-enablement
   destination:
     name: in-cluster

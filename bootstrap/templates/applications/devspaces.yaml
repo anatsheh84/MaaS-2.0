@@ -10,9 +10,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: {{ .Values.llmaas.repoURL }}
-    targetRevision: {{ .Values.llmaas.targetRevision }}
-    path: deployments/devspaces
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/devspaces
   destination:
     name: in-cluster
     namespace: openshift-devspaces

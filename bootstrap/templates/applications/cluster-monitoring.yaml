@@ -10,9 +10,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: {{ .Values.llmaas.repoURL }}
-    targetRevision: {{ .Values.llmaas.targetRevision }}
-    path: deployments/cluster-monitoring
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/cluster-monitoring
   destination:
     name: in-cluster
     namespace: default

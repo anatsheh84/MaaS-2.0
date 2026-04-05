@@ -1,0 +1,67 @@
+{{- range .Values.models }}
+---
+apiVersion: serving.kserve.io/v1alpha1
+kind: LLMInferenceService
+metadata:
+  annotations:
+    alpha.maas.opendatahub.io/tiers: '["free", "premium", "enterprise"]'
+    openshift.io/display-name: {{ .displayName }}
+  labels:
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
+  name: {{ .name }}
+spec:
+  model:
+    name: {{ .name }}
+    uri: {{ .uri }}
+  replicas: 1
+  router:
+    gateway:
+      refs:
+      - name: maas-default-gateway
+        namespace: openshift-ingress
+    route: {}
+  template:
+    containers:
+    - name: main
+      image: {{ .image | default $.Values.image }}
+      command:
+      - python
+      - -m
+      - vllm.entrypoints.openai.api_server
+      args:
+      - "--served-model-name={{ `{{.Name}}` }}"
+      - --model=/mnt/models
+      - --enable-ssl-refresh
+      - --ssl-certfile=/var/run/kserve/tls/tls.crt
+      - --ssl-keyfile=/var/run/kserve/tls/tls.key
+      {{- toYaml .extraArgs | nindent 6 }}
+      ports:
+      - containerPort: 8000
+        name: http
+        protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+          scheme: HTTPS
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+          scheme: HTTPS
+      resources:
+        {{- toYaml .resources | nindent 8 }}
+      volumeMounts:
+      - mountPath: /dev/shm
+        name: shm
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    tolerations:
+      {{- toYaml .tolerations | nindent 6 }}
+    volumes:
+    - emptyDir:
+        medium: Memory
+        sizeLimit: 2Gi
+      name: shm
+{{- end }}

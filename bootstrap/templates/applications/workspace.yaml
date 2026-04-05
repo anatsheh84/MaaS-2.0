@@ -19,9 +19,9 @@ spec:
     spec:
       project: default
       source:
-        repoURL: {{ .Values.llmaas.repoURL }}
-        targetRevision: {{ .Values.llmaas.targetRevision }}
-        path: deployments/workspace
+        repoURL: {{ .Values.bootstrap.repoURL }}
+        targetRevision: {{ .Values.bootstrap.targetRevision }}
+        path: charts/workspace
         helm:
           values: |
             username: "{{`{{ user }}`}}"

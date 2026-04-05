@@ -11,9 +11,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/opendatahub-io/models-as-a-service.git
-    targetRevision: 39e62e98f382621e401211ae21cb9de0601b8266
-    path: deployment/overlays/openshift
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/models-as-a-service/overlays/openshift
     kustomize:
       patches:
         - target:

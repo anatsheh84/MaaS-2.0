@@ -10,9 +10,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: {{ .Values.llmaas.repoURL }}
-    targetRevision: {{ .Values.llmaas.targetRevision }}
-    path: deployments/slack-mcp
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/slack-mcp
     helm:
       # Token is NOT stored in git — create the secret on the cluster first:
       #   oc create secret generic slack-mcp-token -n lls-demo \

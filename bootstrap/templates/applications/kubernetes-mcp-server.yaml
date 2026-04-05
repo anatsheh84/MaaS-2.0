@@ -10,16 +10,16 @@ metadata:
 spec:
   project: default
   sources:
-    # OCI Helm chart from ghcr.io/containers/charts/kubernetes-mcp-server
-    # Values (openshift: true, fullnameOverride, RBAC) from llmaas-multitenant
+    # OCI Helm chart — cannot be copied to git, sourced from registry directly
     - repoURL: oci://ghcr.io/containers/charts/kubernetes-mcp-server
       targetRevision: 0.1.0
       path: .
       helm:
         valueFiles:
-          - $values/deployments/kubernetes-mcp-server/values.yaml
-    - repoURL: {{ .Values.llmaas.repoURL }}
-      targetRevision: {{ .Values.llmaas.targetRevision }}
+          - $values/charts/kubernetes-mcp-server/values.yaml
+    # Values file now lives in our own repo
+    - repoURL: {{ .Values.bootstrap.repoURL }}
+      targetRevision: {{ .Values.bootstrap.targetRevision }}
       ref: values
   destination:
     name: in-cluster

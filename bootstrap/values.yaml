@@ -48,10 +48,6 @@ keycloak:
   enabled: false
 
 # ── Fixed across all deployments ──────────────────────────────────────────────
-llmaas:
-  repoURL: https://github.com/rhpds/private-llmaas-multitenant
-  targetRevision: v1.2.0
-
 users:
   count: 2
   prefix: user
