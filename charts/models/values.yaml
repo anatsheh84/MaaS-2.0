@@ -41,7 +41,7 @@ models:
     extraArgs:
       - --enable-auto-tool-choice
       - --tool-call-parser=llama3_json
-      - --gpu-memory-utilization=0.25
+      - --gpu-memory-utilization=0.45
       - --max-model-len=131072
     tolerations:
       - effect: NoSchedule
