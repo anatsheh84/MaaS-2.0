@@ -59,18 +59,34 @@ spec:
             - containerPort: 8080
               name: http
           env:
+            # ── Server ────────────────────────────────────────────────────────
+            - name: HOST
+              value: '0.0.0.0'
+            - name: PORT
+              value: '8080'
+            - name: NODE_ENV
+              value: production
+            - name: LOG_LEVEL
+              value: info
+            # ── Database ──────────────────────────────────────────────────────
             - name: PG_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: pg-admin-password
             - name: DATABASE_URL
-              value: postgresql://litemaas_admin:$(PG_ADMIN_PASSWORD)@postgres:5432/litemaas_db
+              value: postgresql://litemaas_admin:$(PG_ADMIN_PASSWORD)@postgres:5432/litemaas_db?sslmode=disable
+            # ── Auth / JWT ────────────────────────────────────────────────────
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: jwt-secret
+            - name: JWT_EXPIRES_IN
+              value: '24h'
+            # ── OAuth ─────────────────────────────────────────────────────────
+            - name: AUTH_PROVIDER
+              value: openshift
             - name: OAUTH_CLIENT_ID
               value: {{ .Values.oauth.clientId }}
             - name: OAUTH_CLIENT_SECRET
@@ -78,11 +94,22 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: oauth-client-secret
-            - name: ADMIN_API_KEY
+            - name: OAUTH_ISSUER
+              value: "https://oauth-openshift.{{ .Values.deployer.domain }}"
+            - name: OAUTH_CALLBACK_URL
+              value: "https://litemaas-{{ .Values.namespace }}.{{ .Values.deployer.domain }}/api/auth/callback"
+            # ── CORS ──────────────────────────────────────────────────────────
+            - name: CORS_ORIGIN
+              value: "https://litemaas-{{ .Values.namespace }}.{{ .Values.deployer.domain }}"
+            # ── Admin ─────────────────────────────────────────────────────────
+            - name: ADMIN_API_KEYS
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: admin-api-key
+            # ── LiteLLM ───────────────────────────────────────────────────────
+            - name: LITELLM_API_URL
+              value: "https://litellm-{{ .Values.namespace }}.{{ .Values.deployer.domain }}"
             - name: LITELLM_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -93,18 +120,29 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: litellm-master-key
-            - name: LITELLM_URL
-              value: "https://litellm-{{ .Values.namespace }}.{{ .Values.deployer.domain }}"
             - name: LITELLM_DATABASE_URL
               value: postgresql://litemaas_admin:$(PG_ADMIN_PASSWORD)@postgres:5432/litellm_db
-            - name: FRONTEND_URL
-              value: "https://litemaas-{{ .Values.namespace }}.{{ .Values.deployer.domain }}"
-            - name: AUTH_PROVIDER
-              value: openshift
-            - name: OPENSHIFT_OAUTH_BASE_URL
-              value: "https://oauth-openshift.{{ .Values.deployer.domain }}"
-            - name: NODE_ENV
-              value: production
+            # ── Redis ─────────────────────────────────────────────────────────
+            - name: REDIS_HOST
+              value: litellm-redis
+            - name: REDIS_PORT
+              value: '6379'
+            # ── Rate limiting defaults ─────────────────────────────────────────
+            - name: RATE_LIMIT_MAX
+              value: '1000'
+            - name: RATE_LIMIT_TIME_WINDOW
+              value: '5m'
+            # ── User defaults ─────────────────────────────────────────────────
+            - name: DEFAULT_USER_MAX_BUDGET
+              value: '100'
+            - name: DEFAULT_USER_TPM_LIMIT
+              value: '100000'
+            - name: DEFAULT_USER_RPM_LIMIT
+              value: '120'
+            # ── Storage ───────────────────────────────────────────────────────
+            - name: BACKUP_STORAGE_PATH
+              value: /data/backups
+            # ── TLS ───────────────────────────────────────────────────────────
             {{- if eq .Values.nodeTlsRejectUnauthorized "0" }}
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: '0'
@@ -129,7 +167,7 @@ spec:
             failureThreshold: 3
           volumeMounts:
             - name: backup-storage
-              mountPath: /app/backups
+              mountPath: /data/backups
       volumes:
         - name: backup-storage
           persistentVolumeClaim:
