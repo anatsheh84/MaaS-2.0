@@ -6,6 +6,95 @@ Includes **LiteMaaS** — a self-service portal for LLM subscription and API key
 
 ---
 
+## Stack Architecture
+
+> Click any node in the [interactive version](https://claude.ai) — or browse the layers below.
+
+```mermaid
+graph TB
+    USERS(["👤  Users · Browser · API Clients · IDEs"])
+
+    subgraph W8["🚀  Wave 8 — Portals & Tools"]
+        LM["LiteMaaS
+model portal"]
+        LS["Llama Stack
+per-user × 2"]
+        WS["DevSpaces
+workspaces × 2"]
+        MC["k8s-mcp
+Slack MCP"]
+    end
+
+    subgraph AI["🤖  Wave 5–7 — AI Model Serving  (OpenShift AI · KServe · vLLM)"]
+        GW{{"MaaS Gateway · Kuadrant Auth · Rate Limits · Token Tiers"}}
+        M1["llama-3.1-8b-fp8
+1× NVIDIA L40S"]
+        M2["mistral-24b-fp8
+1× NVIDIA L40S"]
+        M3["qwen3-4b-instruct
+1× NVIDIA L40S"]
+    end
+
+    subgraph PS["⚙️  Wave 3–5 — Platform Services"]
+        OAI["OpenShift AI
+RHOAI · KServe"]
+        GF["Grafana
+dashboards"]
+        DV["DevSpaces
+operator"]
+        KC["Keycloak
+SSO · OAuth"]
+    end
+
+    subgraph OP["🔧  Wave 1–4 — Cluster Operators"]
+        AG["ArgoCD
+GitOps"]
+        CM["cert-manager
+Let's Encrypt"]
+        NG["NVIDIA GPU Op.
+NFD · CUDA"]
+        KD["Kuadrant
+RHCL · Envoy GW"]
+    end
+
+    subgraph OCP["🖥️  OpenShift 4.20 · us-east-2b"]
+        WK["Workers × 5
+m6a.4xlarge · 16 vCPU / 64 GB each"]
+        GPU["GPU Node × 1
+g6e.12xlarge · 4× NVIDIA L40S · 184 GB VRAM"]
+    end
+
+    subgraph AW["☁️  AWS · us-east-2"]
+        EC2["EC2"]
+        EBS["EBS gp3"]
+        R53["Route53"]
+        VPC["VPC"]
+    end
+
+    USERS --> W8
+    W8 --> AI
+    AI --> PS
+    PS --> OP
+    OP --> OCP
+    OCP --> AW
+
+    classDef portal  fill:#FAECE7,stroke:#D85A30,color:#712B13
+    classDef ai      fill:#FAEEDA,stroke:#BA7517,color:#633806
+    classDef platform fill:#EEEDFE,stroke:#7F77DD,color:#3C3489
+    classDef operator fill:#E6F1FB,stroke:#378ADD,color:#0C447C
+    classDef ocp     fill:#E1F5EE,stroke:#1D9E75,color:#085041
+    classDef aws     fill:#F1EFE8,stroke:#888780,color:#2C2C2A
+    classDef user    fill:#E1F5EE,stroke:#1D9E75,color:#085041
+
+    class LM,LS,WS,MC portal
+    class GW,M1,M2,M3 ai
+    class OAI,GF,DV,KC platform
+    class AG,CM,NG,KD operator
+    class WK,GPU ocp
+    class EC2,EBS,R53,VPC aws
+    class USERS user
+```
+
 ## Architecture
 
 ```
