@@ -8,7 +8,7 @@ Includes **LiteMaaS** — a self-service portal for LLM subscription and API key
 
 ## Stack Architecture
 
-> Click any node in the [interactive version](https://claude.ai) — or browse the layers below.
+> Click any node in the interactive version — or browse the layers below.
 
 ![Stack Architecture](docs/stack-architecture.svg)
 
