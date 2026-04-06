@@ -11,10 +11,11 @@ Includes **LiteMaaS** — a self-service portal for LLM subscription and API key
 > Click any node in the [interactive version](https://claude.ai) — or browse the layers below.
 
 ```mermaid
-graph TB
+flowchart TB
     USERS(["👤  Users · Browser · API Clients · IDEs"])
 
     subgraph W8["🚀  Wave 8 — Portals & Tools"]
+        direction LR
         LM["LiteMaaS
 model portal"]
         LS["Llama Stack
@@ -26,6 +27,7 @@ Slack MCP"]
     end
 
     subgraph AI["🤖  Wave 5–7 — AI Model Serving  (OpenShift AI · KServe · vLLM)"]
+        direction LR
         GW{{"MaaS Gateway · Kuadrant Auth · Rate Limits · Token Tiers"}}
         M1["llama-3.1-8b-fp8
 1× NVIDIA L40S"]
@@ -36,6 +38,7 @@ Slack MCP"]
     end
 
     subgraph PS["⚙️  Wave 3–5 — Platform Services"]
+        direction LR
         OAI["OpenShift AI
 RHOAI · KServe"]
         GF["Grafana
@@ -47,6 +50,7 @@ SSO · OAuth"]
     end
 
     subgraph OP["🔧  Wave 1–4 — Cluster Operators"]
+        direction LR
         AG["ArgoCD
 GitOps"]
         CM["cert-manager
@@ -58,13 +62,15 @@ RHCL · Envoy GW"]
     end
 
     subgraph OCP["🖥️  OpenShift 4.20 · us-east-2b"]
+        direction LR
         WK["Workers × 5
-m6a.4xlarge · 16 vCPU / 64 GB each"]
+m6a.4xlarge · 16 vCPU · 64 GB each"]
         GPU["GPU Node × 1
 g6e.12xlarge · 4× NVIDIA L40S · 184 GB VRAM"]
     end
 
     subgraph AW["☁️  AWS · us-east-2"]
+        direction LR
         EC2["EC2"]
         EBS["EBS gp3"]
         R53["Route53"]
@@ -78,13 +84,13 @@ g6e.12xlarge · 4× NVIDIA L40S · 184 GB VRAM"]
     OP --> OCP
     OCP --> AW
 
-    classDef portal  fill:#FAECE7,stroke:#D85A30,color:#712B13
-    classDef ai      fill:#FAEEDA,stroke:#BA7517,color:#633806
+    classDef portal   fill:#FAECE7,stroke:#D85A30,color:#712B13
+    classDef ai       fill:#FAEEDA,stroke:#BA7517,color:#633806
     classDef platform fill:#EEEDFE,stroke:#7F77DD,color:#3C3489
     classDef operator fill:#E6F1FB,stroke:#378ADD,color:#0C447C
-    classDef ocp     fill:#E1F5EE,stroke:#1D9E75,color:#085041
-    classDef aws     fill:#F1EFE8,stroke:#888780,color:#2C2C2A
-    classDef user    fill:#E1F5EE,stroke:#1D9E75,color:#085041
+    classDef ocp      fill:#E1F5EE,stroke:#1D9E75,color:#085041
+    classDef aws      fill:#F1EFE8,stroke:#888780,color:#2C2C2A
+    classDef user     fill:#E1F5EE,stroke:#1D9E75,color:#085041
 
     class LM,LS,WS,MC portal
     class GW,M1,M2,M3 ai
