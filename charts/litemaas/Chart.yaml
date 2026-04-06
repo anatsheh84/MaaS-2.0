@@ -1,0 +1,8 @@
+apiVersion: v2
+name: litemaas
+description: >
+  LiteMaaS - Models as a Service Platform.
+  Self-service LLM subscription and API key management backed by LiteLLM and PostgreSQL.
+type: application
+version: 0.1.0
+appVersion: "0.4.0"

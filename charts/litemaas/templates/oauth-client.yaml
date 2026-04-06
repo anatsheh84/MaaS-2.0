@@ -1,0 +1,12 @@
+# OAuthClient for LiteMaaS — cluster-scoped resource.
+# The secret referenced here must be pre-created (existingSecret).
+apiVersion: oauth.openshift.io/v1
+kind: OAuthClient
+metadata:
+  name: {{ .Values.oauth.clientId }}
+  labels:
+    app.kubernetes.io/part-of: litemaas
+secret: litemaas-oauth-secret
+redirectURIs:
+  - "https://litemaas-{{ .Values.namespace }}.{{ .Values.deployer.domain }}/api/auth/callback"
+grantMethod: auto

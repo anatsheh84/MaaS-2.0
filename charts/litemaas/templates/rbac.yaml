@@ -1,0 +1,51 @@
+# OpenShift Groups for LiteMaaS role-based access control.
+# litemaas-admins → admin role (full access)
+# litemaas-readonly → adminReadonly role (view only)
+# litemaas-users → user role (default for all authenticated users)
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: {{ .Values.rbac.adminGroup }}
+  labels:
+    app.kubernetes.io/part-of: litemaas
+users:
+  {{- range .Values.rbac.adminUsers }}
+  - {{ . }}
+  {{- end }}
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: {{ .Values.rbac.readonlyGroup }}
+  labels:
+    app.kubernetes.io/part-of: litemaas
+users: []
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: {{ .Values.rbac.usersGroup }}
+  labels:
+    app.kubernetes.io/part-of: litemaas
+users: []
+---
+# Grant admin users access to the litemaas namespace
+{{- range .Values.rbac.adminUsers }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: litemaas-admin-{{ . }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: litemaas
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: {{ . }}
+---
+{{- end }}

@@ -248,6 +248,68 @@ else
 fi
 
 
+
+
+# ── Step 5c: Generate LiteMaaS secrets ────────────────────────────────────────
+step "Step 5c/7 — Generating LiteMaaS secrets (litemaas-test namespace)"
+#
+# All passwords are generated fresh with openssl — nothing is hardcoded.
+# The secret is created directly on the cluster and NEVER written to git.
+# ArgoCD's litemaas chart references it via existingSecret: litemaas-secrets.
+#
+LITEMAAS_NS="litemaas-test"
+LITEMAAS_SECRET="litemaas-secrets"
+
+oc get namespace "$LITEMAAS_NS" &>/dev/null || oc create namespace "$LITEMAAS_NS"
+info "Namespace $LITEMAAS_NS ready"
+
+if oc get secret "$LITEMAAS_SECRET" -n "$LITEMAAS_NS" &>/dev/null; then
+  warn "$LITEMAAS_SECRET already exists in $LITEMAAS_NS — skipping generation"
+  warn "Delete it first if you want fresh secrets:"
+  warn "  oc delete secret $LITEMAAS_SECRET -n $LITEMAAS_NS"
+else
+  PG_ADMIN_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/' | head -c 32)
+  JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')
+  OAUTH_CLIENT_SECRET=$(openssl rand -hex 20)
+  ADMIN_API_KEY=$(openssl rand -hex 16)
+  LITELLM_API_KEY="sk-$(openssl rand -hex 24)"
+  LITELLM_MASTER_KEY=$(openssl rand -base64 32 | tr -d '=+/' | head -c 32)
+  LITELLM_UI_PASSWORD=$(openssl rand -base64 16 | tr -d '=+/')
+
+  oc create secret generic "$LITEMAAS_SECRET" \
+    -n "$LITEMAAS_NS" \
+    --from-literal=pg-admin-password="$PG_ADMIN_PASSWORD" \
+    --from-literal=jwt-secret="$JWT_SECRET" \
+    --from-literal=oauth-client-secret="$OAUTH_CLIENT_SECRET" \
+    --from-literal=admin-api-key="$ADMIN_API_KEY" \
+    --from-literal=litellm-api-key="$LITELLM_API_KEY" \
+    --from-literal=litellm-master-key="$LITELLM_MASTER_KEY" \
+    --from-literal=litellm-ui-username="admin" \
+    --from-literal=litellm-ui-password="$LITELLM_UI_PASSWORD"
+
+  success "$LITEMAAS_SECRET secret created in $LITEMAAS_NS"
+  echo ""
+  echo -e "  ${CYAN}LiteMaaS credentials (save these securely):${NC}"
+  echo -e "    LiteLLM UI  : admin / $LITELLM_UI_PASSWORD"
+  echo -e "    Admin API   : $ADMIN_API_KEY"
+  echo -e "    LiteLLM Key : $LITELLM_API_KEY"
+  echo ""
+
+  # Also create the OAuthClient for LiteMaaS
+  oc apply -f - <<OAUTH
+apiVersion: oauth.openshift.io/v1
+kind: OAuthClient
+metadata:
+  name: litemaas-oauth-client
+  labels:
+    app.kubernetes.io/part-of: litemaas
+secret: "$OAUTH_CLIENT_SECRET"
+redirectURIs:
+  - "https://litemaas-${LITEMAAS_NS}.${APPS_DOMAIN}/api/auth/callback"
+grantMethod: auto
+OAUTH
+  success "OAuthClient litemaas-oauth-client created"
+fi
 # ── Step 6: Deploy bootstrap Application ──────────────────────────────────────
 step "Step 6/7 — Deploying ArgoCD bootstrap Application"
 
@@ -292,6 +354,14 @@ VALUES_PATCH=$(cat <<EOF
           "deployer": {
             "domain": "$APPS_DOMAIN"
           },
+          "litemaas": {
+            "namespace": "litemaas-test",
+            "version": "0.4.0",
+            "existingSecret": "litemaas-secrets",
+            "oauthClientId": "litemaas-oauth-client",
+            "nodeTlsRejectUnauthorized": "0",
+            "adminUsers": ["admin"]
+          },
           "certManager": {
             "issuerName": "letsencrypt-production-ec2",
             "email": "rhpds-admins@redhat.com",
@@ -330,6 +400,8 @@ echo "  ✔  Written to bootstrap/values.local.yaml  (gitignored — never commi
 echo "  ✔  Created cert-manager-aws-creds secret on cluster"
 echo "  ✔  Installed OpenShift GitOps operator"
 echo "  ✔  Created HTPasswd users (user1, user2, admin)"
+echo "  ✔  Generated LiteMaaS secrets in litemaas-test namespace"
+echo "  ✔  Created OAuthClient for LiteMaaS"
 echo "  ✔  Deployed bootstrap ArgoCD Application"
 echo "  ✔  Patched bootstrap with real values (no git commit needed)"
 echo ""
@@ -346,7 +418,11 @@ echo "       user1 / MTkxNDU3   (select 'htpasswd-maas' on login screen)"
 echo "       user2 / MTkxNDU3"
 echo "       admin / NDcxOTE3"
 echo ""
-echo "  4. When the slack-mcp Application is deployed, create the Slack token secret:"
+echo "  4. LiteMaaS portal (once wave 8 syncs):"
+echo "       https://litemaas-litemaas-test.$APPS_DOMAIN"
+echo "       Login with: admin (htpasswd-maas IDP)"
+echo ""
+echo "  5. When the slack-mcp Application is deployed, create the Slack token secret:"
 echo "       oc create secret generic slack-mcp-token -n lls-demo \\"
 echo "         --from-literal=slack-bot-token=<YOUR_SLACK_BOT_TOKEN>"
 echo ""

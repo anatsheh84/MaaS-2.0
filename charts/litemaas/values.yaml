@@ -1,0 +1,88 @@
+# LiteMaaS Helm Chart Values
+# ---------------------------------------------------------
+# Secrets are NOT stored here. Before ArgoCD syncs this app,
+# create the pre-requisite secret on the cluster:
+#
+#   oc create secret generic litemaas-secrets -n <namespace> \
+#     --from-literal=pg-admin-password=<secure-value> \
+#     --from-literal=jwt-secret=<secure-value> \
+#     --from-literal=oauth-client-secret=<secure-value> \
+#     --from-literal=admin-api-key=<secure-value> \
+#     --from-literal=litellm-api-key=sk-<secure-value> \
+#     --from-literal=litellm-master-key=<secure-value> \
+#     --from-literal=litellm-ui-username=admin \
+#     --from-literal=litellm-ui-password=<secure-value>
+# ---------------------------------------------------------
+
+namespace: litemaas
+
+images:
+  backend:
+    repository: quay.io/rh-aiservices-bu/litemaas-backend
+    tag: "0.4.0"
+  frontend:
+    repository: quay.io/rh-aiservices-bu/litemaas-frontend
+    tag: "0.4.0"
+  litellm:
+    repository: quay.io/rh-aiservices-bu/litellm-non-root
+    tag: "main-v1.81.0-stable-custom"
+  redis:
+    repository: docker.io/library/redis
+    tag: "7-alpine"
+  postgres:
+    repository: docker.io/library/postgres
+    tag: "16-alpine"
+
+# Secret name pre-created on cluster before ArgoCD sync
+existingSecret: litemaas-secrets
+
+# OAuth client config (non-sensitive)
+oauth:
+  clientId: litemaas-oauth-client
+  # callbackUrl is derived from domain: https://litemaas-<namespace>.<domain>/api/auth/callback
+
+# Cluster domain - injected from bootstrap values
+deployer:
+  domain: ""
+
+# TLS - set to "0" for clusters with self-signed certs (standard for RHPDS/sandbox)
+nodeTlsRejectUnauthorized: "0"
+
+# RBAC - OpenShift groups that map to LiteMaaS roles
+rbac:
+  adminGroup: litemaas-admins
+  readonlyGroup: litemaas-readonly
+  usersGroup: litemaas-users
+  # Users to add to the admin group
+  adminUsers:
+    - admin
+
+postgres:
+  storage: 10Gi
+  storageClass: ""   # uses cluster default
+
+backend:
+  pvcSize: 5Gi
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+
+frontend:
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "25m"
+    limits:
+      memory: "256Mi"
+
+litellm:
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
