@@ -295,7 +295,9 @@ else
   echo -e "    LiteLLM Key : $LITELLM_API_KEY"
   echo ""
 
-  # Also create the OAuthClient for LiteMaaS
+  # Create the OAuthClient for LiteMaaS.
+  # NOTE: This is NOT managed by ArgoCD — OpenShift cluster-scoped auth resources
+  # cause structured merge diff errors. configure.sh owns the OAuthClient lifecycle.
   oc apply -f - <<OAUTH
 apiVersion: oauth.openshift.io/v1
 kind: OAuthClient

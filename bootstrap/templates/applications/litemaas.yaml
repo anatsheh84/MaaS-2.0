@@ -57,10 +57,6 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-  # Ignore the OAuthClient secret field — it contains a live token that
-  # OpenShift updates and ArgoCD should not drift-detect on it.
-  ignoreDifferences:
-    - group: oauth.openshift.io
-      kind: OAuthClient
-      jsonPointers:
-        - /secret
+  # Note: OAuthClient is NOT managed by ArgoCD — OpenShift identity/auth
+  # cluster-scoped resources cause structured merge diff errors in ArgoCD.
+  # OAuthClient is created by configure.sh on fresh deployments.
