@@ -17,154 +17,792 @@ spec:
     {
       "title": "SDAIA AI Ethics Principles \u2014 Compliance View",
       "description": "SDAIA AI Ethics Principles v2.0 compliance dashboard. Organised by principle with contextual metric explanations. Namespace: llm | Platform: OpenShift AI 3.2",
-      "tags": ["sdaia", "ai-governance", "compliance", "openshift-ai", "principles-view"],
+      "tags": [
+        "sdaia",
+        "ai-governance",
+        "compliance",
+        "openshift-ai",
+        "principles-view"
+      ],
       "timezone": "browser",
       "refresh": "30s",
-      "time": {"from": "now-3h", "to": "now"},
+      "time": {
+        "from": "now-3h",
+        "to": "now"
+      },
       "panels": [
         {
-          "id": 1, "type": "text", "title": "SDAIA AI Governance \u2014 Compliance Dashboard",
-          "gridPos": {"h": 5, "w": 24, "x": 0, "y": 0},
+          "id": 1,
+          "type": "text",
+          "title": "SDAIA AI Governance \u2014 Compliance Dashboard",
+          "gridPos": {
+            "h": 5,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
           "options": {
             "mode": "html",
             "content": "<div style='background:linear-gradient(135deg,#1a1a2e,#16213e);padding:20px;border-radius:10px;border-left:6px solid #cc0000;font-family:sans-serif'>\n<div style='display:flex;align-items:center;gap:16px;margin-bottom:12px'>\n  <span style='font-size:2.5em'>\ud83c\uddf8\ud83c\udde6</span>\n  <div>\n    <h1 style='color:#fff;margin:0;font-size:1.6em'>SDAIA AI Ethics Principles \u2014 Live Compliance Dashboard</h1>\n    <p style='color:#aaa;margin:4px 0 0'>Saudi Data & AI Authority (SDAIA) | AI Ethics Principles v2.0 \u2014 September 2023</p>\n  </div>\n</div>\n<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px'>\n  <div style='background:rgba(255,255,255,0.07);padding:10px;border-radius:6px;border-top:3px solid #4CAF50'>\n    <div style='color:#4CAF50;font-weight:bold;font-size:0.85em'>PRINCIPLE 5</div>\n    <div style='color:#fff;font-size:0.9em'>Reliability &amp; Safety</div>\n    <div style='color:#aaa;font-size:0.75em'>Model performance &amp; capacity</div>\n  </div>\n  <div style='background:rgba(255,255,255,0.07);padding:10px;border-radius:6px;border-top:3px solid #2196F3'>\n    <div style='color:#2196F3;font-weight:bold;font-size:0.85em'>PRINCIPLE 7</div>\n    <div style='color:#fff;font-size:0.9em'>Accountability &amp; Responsibility</div>\n    <div style='color:#aaa;font-size:0.75em'>Audit trails &amp; incident tracking</div>\n  </div>\n  <div style='background:rgba(255,255,255,0.07);padding:10px;border-radius:6px;border-top:3px solid #9C27B0'>\n    <div style='color:#9C27B0;font-weight:bold;font-size:0.85em'>PLATFORM</div>\n    <div style='color:#fff;font-size:0.9em'>OpenShift AI 3.2 / KServe / vLLM</div>\n    <div style='color:#aaa;font-size:0.75em'>Namespace: llm | 4 active models</div>\n  </div>\n  <div style='background:rgba(255,255,255,0.07);padding:10px;border-radius:6px;border-top:3px solid #FF9800'>\n    <div style='color:#FF9800;font-weight:bold;font-size:0.85em'>SCOPE</div>\n    <div style='color:#fff;font-size:0.9em'>llama-3.1-8b | mistral-24b</div>\n    <div style='color:#aaa;font-size:0.75em'>phi-4 | qwen3-4b</div>\n  </div>\n</div>\n</div>"
           }
         },
-        {"id": 2, "type": "row", "title": "\ud83d\udcd7 Principle 5 \u2014 Reliability & Safety", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}},
         {
-          "id": 3, "type": "text", "title": "",
-          "gridPos": {"h": 3, "w": 24, "x": 0, "y": 6},
-          "options": {"mode": "html", "content": "<div style='background:linear-gradient(90deg,rgba(76,175,80,0.15),rgba(76,175,80,0.03));padding:14px 18px;border-radius:8px;border-left:4px solid #4CAF50;font-family:sans-serif'>\n<span style='color:#4CAF50;font-weight:bold;font-size:1em'>\ud83d\udcd7 SDAIA Principle 5: Reliability & Safety</span>\n<p style='color:#ccc;margin:6px 0 0;font-size:0.88em'>AI systems must be <b style='color:#fff'>technically sound, robust, and continuously monitored</b> to ensure they operate as intended and do not pose risk of harm. Risk management including model interpretability, bias detection, and performance monitoring must be embedded across the full AI lifecycle.</p>\n<p style='color:#888;margin:6px 0 0;font-size:0.8em'>\ud83d\udccc Hover over the <b>\u24d8</b> icon on each panel below for detailed metric context and remediation guidance.</p>\n</div>"}
+          "id": 2,
+          "type": "row",
+          "title": "\ud83d\udcd7 Principle 5 \u2014 Reliability & Safety",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 5
+          }
         },
         {
-          "id": 4, "type": "stat", "title": "\ud83e\udde0 KV Cache Utilization %",
-          "description": "SDAIA Principle 5 \u2014 Reliability & Safety\n\nKV cache is GPU memory used by vLLM. >85% risks request drops.\n\nThresholds: Green 0-70%, Yellow 70-85%, Red >85%",
-          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 9},
-          "targets": [{"expr": "kserve_vllm:kv_cache_usage_perc{namespace='llm'} * 100", "legendFormat": "{{llm_isvc_name}}"}],
-          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "orientation": "auto"},
-          "fieldConfig": {"defaults": {"unit": "percent", "displayName": "${__field.labels.llm_isvc_name}", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 85}]}, "noValue": "0"}}
+          "id": 3,
+          "type": "text",
+          "title": "",
+          "gridPos": {
+            "h": 3,
+            "w": 24,
+            "x": 0,
+            "y": 6
+          },
+          "options": {
+            "mode": "html",
+            "content": "<div style='background:linear-gradient(90deg,rgba(76,175,80,0.15),rgba(76,175,80,0.03));padding:14px 18px;border-radius:8px;border-left:4px solid #4CAF50;font-family:sans-serif'>\n<span style='color:#4CAF50;font-weight:bold;font-size:1em'>\ud83d\udcd7 SDAIA Principle 5: Reliability & Safety</span>\n<p style='color:#ccc;margin:6px 0 0;font-size:0.88em'>\nAI systems must be <b style='color:#fff'>technically sound, robust, and continuously monitored</b> to ensure they operate as intended and do not pose risk of harm. \nThe SDAIA framework requires: periodic monitoring of model performance, mechanisms to detect degradation, resilience under varying loads, and built-in safeguards to prevent malicious or unintended outcomes. \nRisk management \u2014 including model interpretability, bias detection, and performance monitoring \u2014 must be embedded across the full AI lifecycle.\n</p>\n<p style='color:#888;margin:6px 0 0;font-size:0.8em'>\ud83d\udccc Hover over the <b>\u24d8</b> icon on each panel below for detailed metric context and remediation guidance.</p>\n</div>"
+          }
         },
         {
-          "id": 5, "type": "stat", "title": "\u23f3 Requests Waiting in Queue",
-          "description": "SDAIA Principle 5 \u2014 Reliability & Safety\n\nRequests waiting for GPU resources. Green 0-4, Yellow 5-19, Red >=20.",
-          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 9},
-          "targets": [{"expr": "kserve_vllm:num_requests_waiting{namespace='llm'}", "legendFormat": "{{llm_isvc_name}}"}],
-          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "orientation": "auto"},
-          "fieldConfig": {"defaults": {"unit": "short", "displayName": "${__field.labels.llm_isvc_name}", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "red", "value": 20}]}, "noValue": "0"}}
-        },
-        {
-          "id": 6, "type": "timeseries", "title": "\u26a1 Time to First Token \u2014 P50 & P95 (1h window)",
-          "description": "SDAIA Principle 5 \u2014 TTFT P50/P95. <0.5s Excellent, 0.5-2s Acceptable, >2s Poor (red).",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 9},
+          "id": 4,
+          "type": "stat",
+          "title": "\ud83e\udde0 KV Cache Utilization %",
+          "description": "SDAIA Principle 5 \u2014 Reliability & Safety\n\nWHAT THIS MEASURES:\nKV (Key-Value) cache is the GPU memory used by vLLM to store attention states during inference. When this fills up, new requests are either queued or preempted, degrading response quality and throughput.\n\nTHRESHOLDS:\n\u2022 Green (0\u201370%): Normal operating range\n\u2022 Yellow (70\u201385%): Elevated \u2014 monitor closely, consider scaling\n\u2022 Red (>85%): Critical \u2014 requests will be dropped or severely delayed\n\nSDAIA COMPLIANCE CONTEXT:\nThe framework requires AI systems to be designed to 'withstand uncertainty, instability and volatility'. High cache pressure is a direct reliability risk. Document any breach in your AI Ethics annual report.\n\nREMEDIATION:\nScale the model deployment, reduce max_tokens limits, or deploy an additional model replica.",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 9
+          },
           "targets": [
-            {"expr": "histogram_quantile(0.50, sum by (le, llm_isvc_name)(rate(kserve_vllm:time_to_first_token_seconds_bucket{namespace='llm'}[1h])))", "legendFormat": "p50 \u2014 {{llm_isvc_name}}"},
-            {"expr": "histogram_quantile(0.95, sum by (le, llm_isvc_name)(rate(kserve_vllm:time_to_first_token_seconds_bucket{namespace='llm'}[1h])))", "legendFormat": "p95 \u2014 {{llm_isvc_name}}"}
+            {
+              "expr": "kserve_vllm:kv_cache_usage_perc{namespace='llm'} * 100",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
           ],
-          "fieldConfig": {"defaults": {"unit": "s", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
-        },
-        {
-          "id": 7, "type": "timeseries", "title": "\ud83e\ude99 Token Throughput \u2014 Generation Tokens/s",
-          "description": "SDAIA Principle 5 \u2014 Generation tokens/s. Sudden drops indicate model degradation.",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
-          "targets": [{"expr": "sum by (llm_isvc_name)(rate(kserve_vllm:generation_tokens_total{namespace='llm'}[2m]))", "legendFormat": "{{llm_isvc_name}}"}],
-          "fieldConfig": {"defaults": {"unit": "short", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
-        },
-        {
-          "id": 8, "type": "timeseries", "title": "\ud83e\uddee Avg E2E Latency per Request",
-          "description": "SDAIA Principle 5 \u2014 Average E2E latency = sum/count. High mistral latency is expected (long-form generation).",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
-          "targets": [{"expr": "kserve_vllm:e2e_request_latency_seconds_sum{namespace='llm'} / kserve_vllm:e2e_request_latency_seconds_count{namespace='llm'}", "legendFormat": "avg \u2014 {{llm_isvc_name}}"}],
-          "fieldConfig": {"defaults": {"unit": "s", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
-        },
-        {"id": 9, "type": "row", "title": "\ud83d\udcd8 Principle 7 \u2014 Accountability & Responsibility", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 21}},
-        {
-          "id": 10, "type": "text", "title": "",
-          "gridPos": {"h": 3, "w": 24, "x": 0, "y": 22},
-          "options": {"mode": "html", "content": "<div style='background:linear-gradient(90deg,rgba(33,150,243,0.15),rgba(33,150,243,0.03));padding:14px 18px;border-radius:8px;border-left:4px solid #2196F3;font-family:sans-serif'>\n<span style='color:#2196F3;font-weight:bold;font-size:1em'>\ud83d\udcd8 SDAIA Principle 7: Accountability & Responsibility</span>\n<p style='color:#ccc;margin:6px 0 0;font-size:0.88em'>Entities must maintain <b style='color:#fff'>clear ownership, audit trails, and incident response mechanisms</b> for all AI systems throughout their lifecycle. SDAIA requires a designated Responsible AI Officer (RAIO), documented AI Ethics Plans, annual reporting with performance KPIs, and incident escalation pathways to SDAIA.</p>\n<p style='color:#888;margin:6px 0 0;font-size:0.8em'>\ud83d\udccc Hover over the <b>\u24d8</b> icon on each panel below for detailed metric context and remediation guidance.</p>\n</div>"}
-        },
-        {
-          "id": 11, "type": "stat", "title": "\u2705 Total Requests \u2014 Audit Counter",
-          "description": "SDAIA Principle 7 \u2014 Cumulative total of all chat completion requests. Primary audit trail counter.",
-          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 25},
-          "targets": [{"expr": "sum by (llm_isvc_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'})", "legendFormat": "{{llm_isvc_name}}"}],
-          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "orientation": "auto"},
-          "fieldConfig": {"defaults": {"unit": "short", "displayName": "${__field.labels.llm_isvc_name}", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}, "noValue": "0"}}
-        },
-        {
-          "id": 12, "type": "stat", "title": "\u26a0\ufe0f Error Rate % \u2014 Incident Indicator",
-          "description": "SDAIA Principle 7 \u2014 Error rate. Green 0-1.9%, Yellow 2-4.9%, Red >=5%. Any sustained breach requires RAIO incident report.",
-          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 25},
-          "targets": [
-            {"expr": "100 * sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm', status!='2xx'}[5m])) / sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}[5m]))", "legendFormat": "{{llm_isvc_name}}", "refId": "A"},
-            {"expr": "sum by (llm_isvc_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}) * 0", "legendFormat": "{{llm_isvc_name}}", "refId": "B"}
-          ],
-          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "orientation": "auto"},
-          "fieldConfig": {"defaults": {"unit": "percent", "displayName": "${__field.labels.llm_isvc_name}", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 2}, {"color": "red", "value": 5}]}, "noValue": "0"}}
-        },
-        {
-          "id": 13, "type": "timeseries", "title": "\ud83d\udcc8 Request Volume Over Time \u2014 Activity Audit Trail",
-          "description": "SDAIA Principle 7 \u2014 Rate of requests per minute per model. Primary activity timeline for audit purposes.",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 25},
-          "targets": [{"expr": "sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}[2m])) * 60", "legendFormat": "{{llm_isvc_name}}"}],
-          "fieldConfig": {"defaults": {"unit": "reqpm", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
-        },
-        {
-          "id": 14, "type": "timeseries", "title": "\ud83d\udd04 Request Abort Rate \u2014 Unfulfilled User Requests",
-          "description": "SDAIA Principle 7 \u2014 Aborted requests represent users who did not receive expected AI output. Sustained rate requires RAIO incident documentation.",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 29},
-          "targets": [{"expr": "sum by (llm_isvc_name)(rate(kserve_vllm:request_success_total{namespace='llm', finished_reason='abort'}[5m]))", "legendFormat": "{{llm_isvc_name}}"}],
-          "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
-        },
-        {
-          "id": 15, "type": "piechart", "title": "\ud83c\udfc1 Request Completion Reasons \u2014 Quality Breakdown",
-          "description": "SDAIA Principle 7 \u2014 stop=normal, length=truncated (max_tokens hit), abort=terminated. High length rate may indicate prompt engineering issues.",
-          "gridPos": {"h": 8, "w": 8, "x": 12, "y": 29},
-          "targets": [{"expr": "sum by (finished_reason)(kserve_vllm:request_success_total{namespace='llm'})", "legendFormat": "{{finished_reason}}"}],
-          "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}},
-          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}}
-        },
-        {
-          "id": 16, "type": "timeseries", "title": "\ud83d\udcca Prompt vs Generation Tokens \u2014 Usage Pattern Audit",
-          "description": "SDAIA Principle 7 \u2014 Unusual shifts in prompt-to-generation ratios may indicate prompt injection or jailbreak attempts.",
-          "gridPos": {"h": 8, "w": 4, "x": 20, "y": 29},
-          "targets": [
-            {"expr": "sum by (llm_isvc_name)(rate(kserve_vllm:prompt_tokens_total{namespace='llm'}[2m]))", "legendFormat": "prompt \u2014 {{llm_isvc_name}}"},
-            {"expr": "sum by (llm_isvc_name)(rate(kserve_vllm:generation_tokens_total{namespace='llm'}[2m]))", "legendFormat": "generated \u2014 {{llm_isvc_name}}"}
-          ],
-          "fieldConfig": {"defaults": {"unit": "short", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
-        },
-        {"id": 17, "type": "row", "title": "\ud83d\udccb AI System Register \u2014 SDAIA Mandatory Inventory (Principle 7)", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 37}},
-        {
-          "id": 18, "type": "text", "title": "",
-          "gridPos": {"h": 2, "w": 24, "x": 0, "y": 38},
-          "options": {"mode": "html", "content": "<div style='background:linear-gradient(90deg,rgba(255,152,0,0.15),rgba(255,152,0,0.03));padding:12px 18px;border-radius:8px;border-left:4px solid #FF9800;font-family:sans-serif'>\n<span style='color:#FF9800;font-weight:bold'>\ud83d\udccb SDAIA AI System Register</span>\n<span style='color:#ccc;font-size:0.88em;margin-left:12px'>SDAIA Principle 7 requires all adopting entities to maintain a register of deployed AI systems. This table serves as the <b style='color:#fff'>live AI system inventory</b> for audit and annual reporting purposes.</span>\n</div>"}
-        },
-        {
-          "id": 19, "type": "table", "title": "\ud83e\udd16 Active AI Systems \u2014 Compliance Register",
-          "description": "SDAIA Principle 7 \u2014 Live inventory of all AI models currently deployed. Required for SDAIA audit and annual AI Ethics report.",
-          "gridPos": {"h": 7, "w": 24, "x": 0, "y": 40},
-          "targets": [
-            {"expr": "sum by (llm_isvc_name, namespace, model_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'})", "legendFormat": "", "instant": true, "format": "table", "refId": "A"},
-            {"expr": "kserve_vllm:kv_cache_usage_perc{namespace='llm'} * 100", "legendFormat": "", "instant": true, "format": "table", "refId": "B"},
-            {"expr": "kserve_vllm:e2e_request_latency_seconds_sum{namespace='llm'} / kserve_vllm:e2e_request_latency_seconds_count{namespace='llm'}", "legendFormat": "", "instant": true, "format": "table", "refId": "C"}
-          ],
-          "options": {"sortBy": [{"displayName": "Model Name", "desc": false}]},
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none",
+            "orientation": "auto"
+          },
           "fieldConfig": {
-            "defaults": {"custom": {"align": "left"}},
+            "defaults": {
+              "unit": "percent",
+              "displayName": "${__field.labels.llm_isvc_name}",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 70
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
+                ]
+              },
+              "noValue": "0"
+            }
+          }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "\u23f3 Requests Waiting in Queue",
+          "description": "SDAIA Principle 5 \u2014 Reliability & Safety\n\nWHAT THIS MEASURES:\nNumber of inference requests currently sitting in the vLLM scheduler queue waiting for GPU resources. This is a real-time capacity pressure indicator.\n\nTHRESHOLDS:\n\u2022 Green (0\u20134): Normal \u2014 requests are processing promptly\n\u2022 Yellow (5\u201319): Elevated \u2014 users experiencing increased latency\n\u2022 Red (\u226520): Critical \u2014 significant backlog, SLA breach likely\n\nSDAIA COMPLIANCE CONTEXT:\nSDAIA requires that AI systems 'prevent malicious usage and protect entities and individuals from harm'. A growing queue is a reliability failure that must be monitored and escalated. Entities must have mechanisms to assess the system's influence on end-users \u2014 high queues directly degrade that experience.\n\nREMEDIATION:\nImmediate: reduce concurrent request load. Medium-term: scale replicas or upgrade GPU capacity.",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 9
+          },
+          "targets": [
+            {
+              "expr": "kserve_vllm:num_requests_waiting{namespace='llm'}",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none",
+            "orientation": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "displayName": "${__field.labels.llm_isvc_name}",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 5
+                  },
+                  {
+                    "color": "red",
+                    "value": 20
+                  }
+                ]
+              },
+              "noValue": "0"
+            }
+          }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "\u26a1 Time to First Token \u2014 P50 & P95 (1h window)",
+          "description": "SDAIA Principle 5 \u2014 Reliability & Safety\n\nWHAT THIS MEASURES:\nTime to First Token (TTFT) \u2014 the elapsed time from when the user submits a request to when the model begins streaming its first output token. This is the primary perceived latency for interactive AI applications.\n\nHOW IT IS CALCULATED:\nP50 = median experience (50% of users see this or better)\nP95 = worst-case experience for 95th percentile of users\nUsing a 1-hour rate window for histogram stability.\n\nTHRESHOLDS:\n\u2022 <0.5s: Excellent \u2014 near-real-time experience\n\u2022 0.5\u20132s: Acceptable for most use cases\n\u2022 >2s: Poor \u2014 noticeable lag, user experience degraded (red threshold)\n\nSDAIA COMPLIANCE CONTEXT:\nReliability requires systems to 'conform to intended functionality and outcomes'. Sustained high TTFT indicates the model is not operating within its designed parameters. Log P95 breaches for your AI Ethics performance report.\n\nNOTE: NaN values appear when no requests have been made in the measurement window \u2014 this is expected on idle clusters.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 9
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum by (le, llm_isvc_name)(rate(kserve_vllm:time_to_first_token_seconds_bucket{namespace='llm'}[1h])))",
+              "legendFormat": "p50 \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, llm_isvc_name)(rate(kserve_vllm:time_to_first_token_seconds_bucket{namespace='llm'}[1h])))",
+              "legendFormat": "p95 \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "\ud83e\ude99 Token Throughput \u2014 Generation Tokens/s",
+          "description": "SDAIA Principle 5 \u2014 Reliability & Safety\n\nWHAT THIS MEASURES:\nGeneration tokens per second \u2014 the number of output tokens the model is actively producing across all requests. This is the primary throughput indicator for model capacity planning.\n\nSDAIA COMPLIANCE CONTEXT:\nA sudden drop in token throughput without a corresponding drop in request volume indicates model degradation \u2014 a direct reliability failure. SDAIA requires 'continuous implementation/continuous development' monitoring. Sustained throughput drops must be investigated and documented.\n\nWHAT TO LOOK FOR:\n\u2022 Stable throughput = healthy model\n\u2022 Step-down drop = possible GPU throttling or memory pressure\n\u2022 Gradual decline = potential model drift or infrastructure degradation\n\nNOTE: This metric shows 0 on idle clusters with no active inference traffic.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 13
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_vllm:generation_tokens_total{namespace='llm'}[2m]))",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "\ud83e\uddee Avg E2E Latency per Request (sum\u00f7count)",
+          "description": "SDAIA Principle 5 \u2014 Reliability & Safety\n\nWHAT THIS MEASURES:\nAverage end-to-end request latency = total time from request submission to final token received. Calculated as sum/count from cumulative counters (always available, no NaN).\n\nIMPORTANT CONTEXT FOR THIS CLUSTER:\n\u2022 llama-3.1-8b avg: ~1.8s (86 tokens/req average)\n\u2022 phi-4-instruct avg: ~3.6s (139 tokens/req average)\n\u2022 qwen3-4b avg: ~4.5s (325 tokens/req average)\n\u2022 mistral-small-24b avg: ~59s (1,497 tokens/req average)\n\nmistral's high latency is NOT a fault \u2014 it is generating ~17x more tokens per request than llama. This is expected behaviour for long-form generation tasks.\n\nSDAIA COMPLIANCE CONTEXT:\nEntities must document 'objectives and indicators for measuring the performance of AI'. This metric feeds directly into your AI Ethics performance report. Unexpected spikes (not explained by token volume) require investigation.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 13
+          },
+          "targets": [
+            {
+              "expr": "kserve_vllm:e2e_request_latency_seconds_sum{namespace='llm'} / kserve_vllm:e2e_request_latency_seconds_count{namespace='llm'}",
+              "legendFormat": "avg \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
+        },
+        {
+          "id": 9,
+          "type": "row",
+          "title": "\ud83d\udcd8 Principle 7 \u2014 Accountability & Responsibility",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 21
+          }
+        },
+        {
+          "id": 10,
+          "type": "text",
+          "title": "",
+          "gridPos": {
+            "h": 3,
+            "w": 24,
+            "x": 0,
+            "y": 22
+          },
+          "options": {
+            "mode": "html",
+            "content": "<div style='background:linear-gradient(90deg,rgba(33,150,243,0.15),rgba(33,150,243,0.03));padding:14px 18px;border-radius:8px;border-left:4px solid #2196F3;font-family:sans-serif'>\n<span style='color:#2196F3;font-weight:bold;font-size:1em'>\ud83d\udcd8 SDAIA Principle 7: Accountability & Responsibility</span>\n<p style='color:#ccc;margin:6px 0 0;font-size:0.88em'>\nEntities must maintain <b style='color:#fff'>clear ownership, audit trails, and incident response mechanisms</b> for all AI systems throughout their lifecycle. \nSDAIA requires: a designated Responsible AI Officer (RAIO), documented AI Ethics Plans, annual reporting with performance KPIs, \nincident escalation pathways to SDAIA, and mechanisms for affected persons to seek correction or appeal decisions.\nAll AI systems in production must be registered and actively monitored.\n</p>\n<p style='color:#888;margin:6px 0 0;font-size:0.8em'>\ud83d\udccc Hover over the <b>\u24d8</b> icon on each panel below for detailed metric context and remediation guidance.</p>\n</div>"
+          }
+        },
+        {
+          "id": 11,
+          "type": "stat",
+          "title": "\u2705 Total Requests \u2014 Audit Counter",
+          "description": "SDAIA Principle 7 \u2014 Accountability & Responsibility\n\nWHAT THIS MEASURES:\nCumulative total of all chat completion requests processed by each model since deployment. This is the primary audit trail counter.\n\nSDAIA COMPLIANCE CONTEXT:\nSDAIA requires entities to 'maintain audit trails of AI lifecycle decisions'. This counter is the foundation of your AI system activity log. It should be:\n1. Recorded in your AI Ethics annual report\n2. Cross-referenced with your AI system register\n3. Available for SDAIA audit upon request\n\nUSE THIS METRIC TO:\n\u2022 Demonstrate active AI system usage to regulators\n\u2022 Track which models are being used and at what volume\n\u2022 Detect unexpected drops in usage that may indicate system failures",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 25
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'})",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none",
+            "orientation": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "displayName": "${__field.labels.llm_isvc_name}",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "noValue": "0"
+            }
+          }
+        },
+        {
+          "id": 12,
+          "type": "stat",
+          "title": "\u26a0\ufe0f Error Rate % \u2014 Incident Indicator",
+          "description": "SDAIA Principle 7 \u2014 Accountability & Responsibility\n\nWHAT THIS MEASURES:\nPercentage of chat completion requests that returned a 4xx or 5xx HTTP error response. Shows 0% for all models with no errors.\n\nHOW IT WORKS:\n\u2022 Target A: Actual error rate (only appears when errors exist)\n\u2022 Target B: Zero anchor for all models (ensures all 4 models always display)\n\nTHRESHOLDS:\n\u2022 Green (0\u20131.9%): Acceptable error level\n\u2022 Yellow (2\u20134.9%): Elevated \u2014 investigate cause\n\u2022 Red (\u22655%): Critical \u2014 potential system fault requiring incident report\n\nSDAIA COMPLIANCE CONTEXT:\nSDAIA mandates 'incident reporting and remediation' mechanisms. Any sustained error rate above threshold must be:\n1. Logged as an AI system incident\n2. Root-cause investigated\n3. Reported to the RAIO (Responsible AI Officer)\n4. Documented in the AI Ethics annual report\n\nNOTE: mistral-small-24b has recorded 8 x 4xx errors on this cluster \u2014 currently at 0% rate as they are historical.",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 25
+          },
+          "targets": [
+            {
+              "expr": "100 * sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm', status!='2xx'}[5m])) / sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}[5m]))",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}",
+              "refId": "A"
+            },
+            {
+              "expr": "sum by (llm_isvc_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}) * 0",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}",
+              "refId": "B"
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none",
+            "orientation": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "displayName": "${__field.labels.llm_isvc_name}",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 2
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              },
+              "noValue": "0"
+            }
+          }
+        },
+        {
+          "id": 13,
+          "type": "timeseries",
+          "title": "\ud83d\udcc8 Request Volume Over Time \u2014 Activity Audit Trail",
+          "description": "SDAIA Principle 7 \u2014 Accountability & Responsibility\n\nWHAT THIS MEASURES:\nRate of chat completion requests per minute for each model over time. This is the primary activity timeline for audit purposes.\n\nSDAIA COMPLIANCE CONTEXT:\nThis time-series provides the audit trail evidence required by SDAIA \u2014 demonstrating when each AI system was active, at what load, and any periods of inactivity or unusual spikes. Key for:\n\u2022 Demonstrating active governance over deployed AI systems\n\u2022 Identifying unauthorised or unexpected usage patterns\n\u2022 Supporting incident investigations with timeline evidence\n\nWHAT TO LOOK FOR:\n\u2022 Sudden spikes: may indicate automated misuse or load test\n\u2022 Complete drops: may indicate unplanned outage (should be logged)\n\u2022 Gradual growth: capacity planning signal\n\nNOTE: Shows 0 on idle clusters \u2014 will populate under active traffic.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 25
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}[2m])) * 60",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqpm",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
+        },
+        {
+          "id": 14,
+          "type": "timeseries",
+          "title": "\ud83d\udd04 Request Abort Rate \u2014 Unfulfilled User Requests",
+          "description": "SDAIA Principle 7 \u2014 Accountability & Responsibility\n\nWHAT THIS MEASURES:\nRate of requests that were aborted (terminated before completion) per second. Aborted requests indicate the model was unable to fulfil a user's request.\n\nSDAIA COMPLIANCE CONTEXT:\nSDAIA requires 'mechanisms for affected persons to seek correction or appeal decisions'. Aborted requests directly represent users who did not receive their expected AI output. Sustained abort rates must be:\n1. Investigated for root cause (capacity, timeout, client disconnect)\n2. Documented in the incident log\n3. Assessed for impact on affected users\n4. Reported to RAIO if systematic\n\nTHRESHOLDS:\n\u2022 0/s: Normal \u2014 no aborts\n\u2022 >0.1/s: Investigate immediately",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 29
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_vllm:request_success_total{namespace='llm', finished_reason='abort'}[5m]))",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
+        },
+        {
+          "id": 15,
+          "type": "piechart",
+          "title": "\ud83c\udfc1 Request Completion Reasons \u2014 Quality Breakdown",
+          "description": "SDAIA Principle 7 \u2014 Accountability & Responsibility\n\nWHAT THIS MEASURES:\nBreakdown of how requests completed across all models:\n\u2022 stop: Normal completion \u2014 model reached a natural end point \u2705\n\u2022 length: Truncated \u2014 model hit the max_tokens limit \u26a0\ufe0f\n\u2022 abort: Terminated \u2014 request was cancelled or timed out \u274c\n\nSDAIA COMPLIANCE CONTEXT:\nThis breakdown is required evidence for your AI Ethics annual report. Specifically:\n\u2022 High 'length' rate suggests models are being asked to generate beyond their configured limit \u2014 may indicate misconfiguration or prompt engineering issues that affect output quality\n\u2022 High 'abort' rate requires incident documentation\n\u2022 The 'stop' percentage is your primary quality indicator\n\nCURRENT CLUSTER: stop=133, length=11, abort=0 \u2014 92% healthy completion rate.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 12,
+            "y": 29
+          },
+          "targets": [
+            {
+              "expr": "sum by (finished_reason)(kserve_vllm:request_success_total{namespace='llm'})",
+              "legendFormat": "{{"{{"}}finished_reason{{"}}"}}"
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "values": [
+                "value",
+                "percent"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          }
+        },
+        {
+          "id": 16,
+          "type": "timeseries",
+          "title": "\ud83d\udcca Prompt vs Generation Tokens \u2014 Usage Pattern Audit",
+          "description": "SDAIA Principle 7 \u2014 Accountability & Responsibility\n\nWHAT THIS MEASURES:\nPrompt tokens (input) vs generation tokens (output) per second over time, broken down by model. This reveals usage patterns and helps detect anomalous behaviour.\n\nSDAIA COMPLIANCE CONTEXT:\nEntities must 'maintain audit trails of AI lifecycle decisions'. Unusual shifts in prompt-to-generation ratios may indicate:\n\u2022 Prompt injection attempts (very long prompts)\n\u2022 Jailbreak attempts (unusually long generations)\n\u2022 Misconfigured applications sending oversized contexts\n\u2022 Model behaviour drift\n\nUSE THIS FOR:\n\u2022 Baseline normal usage patterns for each model\n\u2022 Anomaly detection in AI system usage\n\u2022 Capacity planning and cost attribution",
+          "gridPos": {
+            "h": 8,
+            "w": 4,
+            "x": 20,
+            "y": 29
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_vllm:prompt_tokens_total{namespace='llm'}[2m]))",
+              "legendFormat": "prompt \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            },
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_vllm:generation_tokens_total{namespace='llm'}[2m]))",
+              "legendFormat": "generated \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
+        },
+        {
+          "id": 17,
+          "type": "row",
+          "title": "\ud83d\udccb AI System Register \u2014 SDAIA Mandatory Inventory (Principle 7)",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 37
+          }
+        },
+        {
+          "id": 18,
+          "type": "text",
+          "title": "",
+          "gridPos": {
+            "h": 2,
+            "w": 24,
+            "x": 0,
+            "y": 38
+          },
+          "options": {
+            "mode": "html",
+            "content": "<div style='background:linear-gradient(90deg,rgba(255,152,0,0.15),rgba(255,152,0,0.03));padding:12px 18px;border-radius:8px;border-left:4px solid #FF9800;font-family:sans-serif'>\n<span style='color:#FF9800;font-weight:bold'>\ud83d\udccb SDAIA AI System Register</span>\n<span style='color:#ccc;font-size:0.88em;margin-left:12px'>\nSDAIA Principle 7 requires all adopting entities to maintain a register of deployed AI systems, including their operational status, responsible officer, and performance indicators.\nThis table serves as the <b style='color:#fff'>live AI system inventory</b> for audit and annual reporting purposes.\nEach entry must be associated with a designated <b style='color:#fff'>Responsible AI Officer (RAIO)</b> and included in the entity's AI Ethics Plan.\n</span>\n</div>"
+          }
+        },
+        {
+          "id": 19,
+          "type": "table",
+          "title": "\ud83e\udd16 Active AI Systems \u2014 Compliance Register",
+          "description": "SDAIA Principle 7 \u2014 Accountability & Responsibility\n\nWHAT THIS TABLE SHOWS:\nA live inventory of all AI models currently deployed and serving inference requests. This is your SDAIA-required AI system register.\n\nCOLUMNS EXPLAINED:\n\u2022 Model Name: Unique identifier of the deployed AI system\n\u2022 Namespace: Kubernetes namespace (deployment boundary)\n\u2022 Total Requests: Cumulative inference count (audit trail)\n\u2022 KV Cache %: Current GPU memory pressure (reliability indicator)\n\u2022 Avg E2E Latency: Average end-to-end response time per request\n\nSDAIA COMPLIANCE USE:\nThis register should be:\n1. Reviewed by the RAIO (Responsible AI Officer) regularly\n2. Cross-referenced with the AI Ethics Plan\n3. Included in the annual AI Ethics report submitted to SDAIA\n4. Made available during SDAIA compliance audits\n\nAny model appearing here without a corresponding entry in the AI Ethics Plan is a compliance gap that must be remediated.",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 40
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name, namespace, model_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'})",
+              "legendFormat": "",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            },
+            {
+              "expr": "kserve_vllm:kv_cache_usage_perc{namespace='llm'} * 100",
+              "legendFormat": "",
+              "instant": true,
+              "format": "table",
+              "refId": "B"
+            },
+            {
+              "expr": "kserve_vllm:e2e_request_latency_seconds_sum{namespace='llm'} / kserve_vllm:e2e_request_latency_seconds_count{namespace='llm'}",
+              "legendFormat": "",
+              "instant": true,
+              "format": "table",
+              "refId": "C"
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Model Name",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "left"
+              }
+            },
             "overrides": [
-              {"matcher": {"id": "byName", "options": "llm_isvc_name"}, "properties": [{"id": "displayName", "value": "Model Name"}]},
-              {"matcher": {"id": "byName", "options": "namespace"}, "properties": [{"id": "displayName", "value": "Namespace"}]},
-              {"matcher": {"id": "byName", "options": "Value #A"}, "properties": [{"id": "displayName", "value": "Total Requests"}, {"id": "unit", "value": "short"}]},
-              {"matcher": {"id": "byName", "options": "Value #B"}, "properties": [{"id": "displayName", "value": "KV Cache %"}, {"id": "unit", "value": "percent"}, {"id": "custom.displayMode", "value": "color-background"}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 85}]}}]},
-              {"matcher": {"id": "byName", "options": "Value #C"}, "properties": [{"id": "displayName", "value": "Avg E2E Latency"}, {"id": "unit", "value": "s"}]},
-              {"matcher": {"id": "byName", "options": "Time"}, "properties": [{"id": "custom.hidden", "value": true}]},
-              {"matcher": {"id": "byName", "options": "model_name"}, "properties": [{"id": "custom.hidden", "value": true}]}
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "llm_isvc_name"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Model Name"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "namespace"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Namespace"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Total Requests"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "KV Cache %"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "percent"
+                  },
+                  {
+                    "id": "custom.displayMode",
+                    "value": "color-background"
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "yellow",
+                          "value": 70
+                        },
+                        {
+                          "color": "red",
+                          "value": 85
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #C"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Avg E2E Latency"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "model_name"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
             ]
           }
         }

@@ -59,7 +59,7 @@ spec:
           "targets": [
             {
               "expr": "sum by (llm_isvc_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'})",
-              "legendFormat": "{{llm_isvc_name}}"
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
             }
           ],
           "options": {
@@ -95,12 +95,12 @@ spec:
           "targets": [
             {
               "expr": "100 * sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm', status!='2xx'}[5m])) / sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}[5m]))",
-              "legendFormat": "{{llm_isvc_name}}",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}",
               "refId": "A"
             },
             {
               "expr": "sum by (llm_isvc_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}) * 0",
-              "legendFormat": "{{llm_isvc_name}}",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}",
               "refId": "B"
             }
           ],
@@ -121,12 +121,23 @@ spec:
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
-                  {"color": "green", "value": null},
-                  {"color": "yellow", "value": 2},
-                  {"color": "red", "value": 5}
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 2
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
                 ]
               },
-              "color": {"mode": "thresholds"},
+              "color": {
+                "mode": "thresholds"
+              },
               "noValue": "0"
             }
           }
@@ -136,117 +147,565 @@ spec:
           "title": "\ud83e\udde0 KV Cache Utilization %",
           "description": "SDAIA P5: Reliability \u2014 GPU memory pressure. >85% risks request drops",
           "type": "stat",
-          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 3},
-          "targets": [{"expr": "kserve_vllm:kv_cache_usage_perc{namespace='llm'} * 100", "legendFormat": "{{llm_isvc_name}}"}],
-          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"},
-          "fieldConfig": {"defaults": {"unit": "percent", "displayName": "${__field.labels.llm_isvc_name}", "min": 0, "max": 100, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 85}]}, "color": {"mode": "thresholds"}}}
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 3
+          },
+          "targets": [
+            {
+              "expr": "kserve_vllm:kv_cache_usage_perc{namespace='llm'} * 100",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "displayName": "${__field.labels.llm_isvc_name}",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 70
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
+                ]
+              },
+              "color": {
+                "mode": "thresholds"
+              }
+            }
+          }
         },
         {
           "id": 5,
           "title": "\u23f3 Requests Queued (Waiting)",
           "description": "SDAIA P5: Reliability \u2014 backlog indicates capacity risk",
           "type": "stat",
-          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 3},
-          "targets": [{"expr": "kserve_vllm:num_requests_waiting{namespace='llm'}", "legendFormat": "{{llm_isvc_name}}"}],
-          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"},
-          "fieldConfig": {"defaults": {"unit": "short", "displayName": "${__field.labels.llm_isvc_name}", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "red", "value": 20}]}, "color": {"mode": "thresholds"}}}
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 3
+          },
+          "targets": [
+            {
+              "expr": "kserve_vllm:num_requests_waiting{namespace='llm'}",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "displayName": "${__field.labels.llm_isvc_name}",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 5
+                  },
+                  {
+                    "color": "red",
+                    "value": 20
+                  }
+                ]
+              },
+              "color": {
+                "mode": "thresholds"
+              }
+            }
+          }
         },
         {
           "id": 6,
           "title": "\ud83d\udcc8 Request Volume Over Time (per model)",
           "description": "SDAIA P7: Audit trail \u2014 inference activity over time per model",
           "type": "timeseries",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 7},
-          "targets": [{"expr": "sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}[2m])) * 60", "legendFormat": "{{llm_isvc_name}}"}],
-          "fieldConfig": {"defaults": {"unit": "reqpm", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 7
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'}[2m])) * 60",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqpm",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
         },
         {
           "id": 7,
           "title": "\u26a1 Time to First Token \u2014 P50 / P95 (1h window)",
-          "description": "SDAIA P5: Reliability \u2014 response latency. P95 >2s is a reliability concern.",
+          "description": "SDAIA P5: Reliability \u2014 response latency using 1h window for stable histogram quantiles. P95 >2s is a reliability concern.",
           "type": "timeseries",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 7},
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 7
+          },
           "targets": [
-            {"expr": "histogram_quantile(0.50, sum by (le, llm_isvc_name)(rate(kserve_vllm:time_to_first_token_seconds_bucket{namespace='llm'}[1h])))", "legendFormat": "p50 \u2014 {{llm_isvc_name}}"},
-            {"expr": "histogram_quantile(0.95, sum by (le, llm_isvc_name)(rate(kserve_vllm:time_to_first_token_seconds_bucket{namespace='llm'}[1h])))", "legendFormat": "p95 \u2014 {{llm_isvc_name}}"}
+            {
+              "expr": "histogram_quantile(0.50, sum by (le, llm_isvc_name)(rate(kserve_vllm:time_to_first_token_seconds_bucket{namespace='llm'}[1h])))",
+              "legendFormat": "p50 \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, llm_isvc_name)(rate(kserve_vllm:time_to_first_token_seconds_bucket{namespace='llm'}[1h])))",
+              "legendFormat": "p95 \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            }
           ],
-          "fieldConfig": {"defaults": {"unit": "s", "custom": {"lineWidth": 2, "fillOpacity": 5}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 2}]}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 5
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 2
+                  }
+                ]
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
         },
         {
           "id": 8,
           "title": "\ud83d\udd04 Request Abort Rate",
-          "description": "SDAIA P7: Accountability \u2014 aborted requests indicate capacity or timeout issues",
+          "description": "SDAIA P7: Accountability \u2014 aborted requests indicate capacity or timeout issues requiring investigation",
           "type": "timeseries",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 15},
-          "targets": [{"expr": "sum by (llm_isvc_name)(rate(kserve_vllm:request_success_total{namespace='llm', finished_reason='abort'}[5m]))", "legendFormat": "aborts \u2014 {{llm_isvc_name}}"}],
-          "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"lineWidth": 2, "fillOpacity": 15}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 15
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_vllm:request_success_total{namespace='llm', finished_reason='abort'}[5m]))",
+              "legendFormat": "aborts \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              },
+              "color": {
+                "mode": "palette-classic"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.1
+                  }
+                ]
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
         },
         {
           "id": 9,
           "title": "\ud83e\ude99 Token Throughput \u2014 Generation Tokens/s",
           "description": "SDAIA P5: Reliability \u2014 throughput health. Significant drops indicate model degradation",
           "type": "timeseries",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 15},
-          "targets": [{"expr": "sum by (llm_isvc_name)(rate(kserve_vllm:generation_tokens_total{namespace='llm'}[2m]))", "legendFormat": "{{llm_isvc_name}}"}],
-          "fieldConfig": {"defaults": {"unit": "short", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 15
+          },
+          "targets": [
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_vllm:generation_tokens_total{namespace='llm'}[2m]))",
+              "legendFormat": "{{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
         },
         {
           "id": 10,
           "title": "\ud83c\udfc1 Request Completion Reasons",
-          "description": "SDAIA P7: stop=normal, length=truncated, abort=terminated",
+          "description": "SDAIA P7: Accountability \u2014 stop=normal, length=truncated (max_tokens hit), abort=terminated. High 'length' rate may indicate prompt engineering issues",
           "type": "piechart",
-          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 23},
-          "targets": [{"expr": "sum by (finished_reason)(kserve_vllm:request_success_total{namespace='llm'})", "legendFormat": "{{finished_reason}}"}],
-          "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}},
-          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}}
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 23
+          },
+          "targets": [
+            {
+              "expr": "sum by (finished_reason)(kserve_vllm:request_success_total{namespace='llm'})",
+              "legendFormat": "{{"{{"}}finished_reason{{"}}"}}"
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "values": [
+                "value",
+                "percent"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          }
         },
         {
           "id": 11,
           "title": "\ud83d\udcca Prompt vs Generation Token Ratio",
-          "description": "SDAIA P5: input/output balance per model",
+          "description": "SDAIA P5: Reliability \u2014 input/output balance per model",
           "type": "timeseries",
-          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 23},
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 23
+          },
           "targets": [
-            {"expr": "sum by (llm_isvc_name)(rate(kserve_vllm:prompt_tokens_total{namespace='llm'}[2m]))", "legendFormat": "prompt \u2014 {{llm_isvc_name}}"},
-            {"expr": "sum by (llm_isvc_name)(rate(kserve_vllm:generation_tokens_total{namespace='llm'}[2m]))", "legendFormat": "generated \u2014 {{llm_isvc_name}}"}
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_vllm:prompt_tokens_total{namespace='llm'}[2m]))",
+              "legendFormat": "prompt \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            },
+            {
+              "expr": "sum by (llm_isvc_name)(rate(kserve_vllm:generation_tokens_total{namespace='llm'}[2m]))",
+              "legendFormat": "generated \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            }
           ],
-          "fieldConfig": {"defaults": {"unit": "short", "custom": {"lineWidth": 2, "fillOpacity": 5}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "lastNotNull"]}}
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 5
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ]
+            }
+          }
         },
         {
           "id": 12,
-          "title": "\ud83e\uddee Avg E2E Latency per Request",
-          "description": "SDAIA P5: true average E2E latency using sum/count",
+          "title": "\ud83e\uddee Avg E2E Latency per Request (sum/count)",
+          "description": "SDAIA P5: Reliability \u2014 true average E2E latency using sum/count. Note: mistral-small-24b avg ~59s is real \u2014 it generates ~1500 tokens/request vs ~87-325 for others.",
           "type": "timeseries",
-          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 23},
-          "targets": [{"expr": "kserve_vllm:e2e_request_latency_seconds_sum{namespace='llm'} / kserve_vllm:e2e_request_latency_seconds_count{namespace='llm'}", "legendFormat": "avg \u2014 {{llm_isvc_name}}"}],
-          "fieldConfig": {"defaults": {"unit": "s", "custom": {"lineWidth": 2, "fillOpacity": 10}, "color": {"mode": "palette-classic"}}},
-          "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"]}}
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 23
+          },
+          "targets": [
+            {
+              "expr": "kserve_vllm:e2e_request_latency_seconds_sum{namespace='llm'} / kserve_vllm:e2e_request_latency_seconds_count{namespace='llm'}",
+              "legendFormat": "avg \u2014 {{"{{"}}llm_isvc_name{{"}}"}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ]
+            }
+          }
         },
         {
           "id": 13,
           "title": "\ud83d\udccb Model Inventory \u2014 SDAIA Accountability Register",
           "description": "SDAIA P7: All active AI systems must be registered and monitored.",
           "type": "table",
-          "gridPos": {"h": 6, "w": 24, "x": 0, "y": 31},
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 31
+          },
           "targets": [
-            {"expr": "sum by (llm_isvc_name, namespace, model_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'})", "legendFormat": "", "instant": true, "format": "table", "refId": "A"},
-            {"expr": "kserve_vllm:kv_cache_usage_perc{namespace='llm'} * 100", "legendFormat": "", "instant": true, "format": "table", "refId": "B"},
-            {"expr": "kserve_vllm:e2e_request_latency_seconds_sum{namespace='llm'} / kserve_vllm:e2e_request_latency_seconds_count{namespace='llm'}", "legendFormat": "", "instant": true, "format": "table", "refId": "C"}
+            {
+              "expr": "sum by (llm_isvc_name, namespace, model_name)(kserve_http_requests_total{handler='/v1/chat/completions', namespace='llm'})",
+              "legendFormat": "",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            },
+            {
+              "expr": "kserve_vllm:kv_cache_usage_perc{namespace='llm'} * 100",
+              "legendFormat": "",
+              "instant": true,
+              "format": "table",
+              "refId": "B"
+            },
+            {
+              "expr": "kserve_vllm:e2e_request_latency_seconds_sum{namespace='llm'} / kserve_vllm:e2e_request_latency_seconds_count{namespace='llm'}",
+              "legendFormat": "",
+              "instant": true,
+              "format": "table",
+              "refId": "C"
+            }
           ],
-          "options": {"sortBy": [{"displayName": "Model Name", "desc": false}]},
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Model Name",
+                "desc": false
+              }
+            ]
+          },
           "fieldConfig": {
-            "defaults": {"custom": {"align": "left"}},
+            "defaults": {
+              "custom": {
+                "align": "left"
+              }
+            },
             "overrides": [
-              {"matcher": {"id": "byName", "options": "Value #A"}, "properties": [{"id": "displayName", "value": "Total Requests"}, {"id": "unit", "value": "short"}]},
-              {"matcher": {"id": "byName", "options": "Value #B"}, "properties": [{"id": "displayName", "value": "KV Cache %"}, {"id": "unit", "value": "percent"}, {"id": "custom.displayMode", "value": "color-background"}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 85}]}}]},
-              {"matcher": {"id": "byName", "options": "Value #C"}, "properties": [{"id": "displayName", "value": "Avg E2E Latency"}, {"id": "unit", "value": "s"}]},
-              {"matcher": {"id": "byName", "options": "llm_isvc_name"}, "properties": [{"id": "displayName", "value": "Model Name"}]},
-              {"matcher": {"id": "byName", "options": "namespace"}, "properties": [{"id": "displayName", "value": "Namespace"}]}
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Total Requests"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "KV Cache %"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "percent"
+                  },
+                  {
+                    "id": "custom.displayMode",
+                    "value": "color-background"
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "yellow",
+                          "value": 70
+                        },
+                        {
+                          "color": "red",
+                          "value": 85
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #C"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Avg E2E Latency"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "llm_isvc_name"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Model Name"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "namespace"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Namespace"
+                  }
+                ]
+              }
             ]
           }
         }
