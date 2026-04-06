@@ -16,3 +16,34 @@ metadata:
   name: tier-enterprise-users
 users:
   - admin
+
+# ── LiteMaaS RBAC groups ──────────────────────────────────────────────────────
+# Managed here (not in the litemaas Helm chart) because ArgoCD's structured
+# merge diff cannot handle user.openshift.io/v1 Kind=Group in Helm charts.
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: litemaas-admins
+  labels:
+    app.kubernetes.io/part-of: litemaas
+users:
+  {{- range .Values.litemaas.adminUsers }}
+  - {{ . }}
+  {{- end }}
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: litemaas-readonly
+  labels:
+    app.kubernetes.io/part-of: litemaas
+users: []
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: litemaas-users
+  labels:
+    app.kubernetes.io/part-of: litemaas
+users: []
