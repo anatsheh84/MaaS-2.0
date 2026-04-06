@@ -6,3 +6,10 @@ bootstrap/values.local.yaml
 
 # Backup files created by configure.sh
 *.bak
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Dashboard source files — already promoted to charts/grafana/templates/
+Dashboards/
