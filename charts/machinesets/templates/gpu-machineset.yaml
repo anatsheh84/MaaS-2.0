@@ -9,8 +9,8 @@ metadata:
     machine.openshift.io/cluster-api-cluster: {{ $.Values.infraID }}
   annotations:
     capacity.cluster-autoscaler.kubernetes.io/labels: kubernetes.io/arch=amd64
-    machine.openshift.io/GPU: "{{ .gpu }}"
-    machine.openshift.io/memoryMb: "{{ .memoryMb }}"
+    # GPU/memoryMb/vCPU annotations are ignored by ArgoCD (see Application
+    # ignoreDifferences) — the machine-api operator owns their values.
     machine.openshift.io/vCPU: "{{ .vCPU }}"
 spec:
   replicas: {{ .replicas }}
