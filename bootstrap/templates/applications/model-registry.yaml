@@ -21,11 +21,10 @@ spec:
   destination:
     name: in-cluster
     namespace: rhoai-model-registries
-  # The ModelRegistry operator mutates the CR after creation by injecting image/resource
-  # defaults and status fields. ServerSideApply prevents ArgoCD from writing
-  # last-applied-configuration (which captures operator-injected status and causes
-  # permanent OutOfSync). RespectIgnoreDifferences ensures ignored fields are
-  # not touched during sync.
+  # The ModelRegistry operator mutates the CR after creation — it strips fields
+  # it does not recognise (skipDBCreation, sslMode) and injects its own image/
+  # resource defaults. ServerSideApply prevents last-applied-configuration drift.
+  # RespectIgnoreDifferences ensures ignored fields are not touched during sync.
   ignoreDifferences:
     - group: modelregistry.opendatahub.io
       kind: ModelRegistry
@@ -34,6 +33,8 @@ spec:
         - /spec/rest/resources
         - /spec/grpc/image
         - /spec/postgres/image
+        - /spec/postgres/skipDBCreation
+        - /spec/postgres/sslMode
         - /status
         - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
   syncPolicy:
