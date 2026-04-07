@@ -20,6 +20,15 @@ metadata:
   namespace: openshift-gitops
 spec:
   resourceTrackingMethod: annotation
+  # Custom health checks for OLM Subscriptions.
+  # ArgoCD's default Subscription health check marks any resource with a
+  # ResolutionFailed condition as Degraded — even when the subscription is
+  # fully installed (state: AtLatestKnown). On RHPDS clusters, the OpenShift-
+  # managed servicemeshoperator3 subscription has a stale version-pinning
+  # conflict that propagates ResolutionFailed to all dependent subscriptions
+  # (grafana, devspaces, rhcl-operator). This causes wave 0 to fail and blocks
+  # wave 1+ resources from ever being applied.
+  # Fix: treat AtLatestKnown as Healthy unconditionally.
   resourceCustomizations: |
     operators.coreos.com/Subscription:
       health.lua: |
@@ -50,32 +59,6 @@ spec:
         end
         health_status.status = "Progressing"
         health_status.message = "Waiting for subscription state"
-        return health_status
-    /PersistentVolumeClaim:
-      health.lua: |
-        health_status = {}
-        if obj.status ~= nil then
-          if obj.status.phase == "Bound" then
-            health_status.status = "Healthy"
-            health_status.message = "PVC is bound"
-            return health_status
-          end
-          if obj.status.phase == "Pending" then
-            -- WaitForFirstConsumer PVCs stay Pending until a Pod mounts them.
-            -- Treat Pending as Healthy so ArgoCD does not block sync waves
-            -- waiting for a PVC that can only bind once its consumer Pod exists.
-            health_status.status = "Healthy"
-            health_status.message = "PVC is pending (WaitForFirstConsumer)"
-            return health_status
-          end
-          if obj.status.phase == "Lost" then
-            health_status.status = "Degraded"
-            health_status.message = "PVC is lost"
-            return health_status
-          end
-        end
-        health_status.status = "Progressing"
-        health_status.message = "Waiting for PVC status"
         return health_status
   server:
     # insecure: true — ArgoCD server runs HTTP internally; TLS is terminated
