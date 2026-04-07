@@ -49,6 +49,17 @@ spec:
   destination:
     name: in-cluster
     namespace: {{ .Values.litemaas.namespace }}
+  # Kubernetes auto-injects apiVersion and kind into volumeClaimTemplates
+  # entries on StatefulSet admission. These fields are absent from the chart
+  # template and cannot be patched back (VCTs are immutable on live StatefulSets),
+  # causing a permanent OutOfSync loop. Ignoring them here.
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      name: postgres
+      jsonPointers:
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
   syncPolicy:
     automated:
       prune: true
@@ -56,6 +67,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
   # Note: OAuthClient is NOT managed by ArgoCD — OpenShift identity/auth
   # cluster-scoped resources cause structured merge diff errors in ArgoCD.
   # OAuthClient is created by configure.sh on fresh deployments.
