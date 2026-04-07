@@ -11,11 +11,6 @@ metadata:
     app.kubernetes.io/name: {{ include "model-registry.postgresServiceName" $name }}
     app.kubernetes.io/part-of: {{ $name }}
     component: {{ include "model-registry.postgresServiceName" $name }}
-  annotations:
-    # Wave 1 — same wave as PVC and Service so the pod can mount the volume
-    # and the DNS name resolves on first boot. ModelRegistry CR is wave 2
-    # and waits for this Deployment to be healthy before applying.
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   revisionHistoryLimit: 0
