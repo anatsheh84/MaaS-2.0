@@ -19,14 +19,30 @@ spec:
       valueFiles:
         - values.yaml
   ignoreDifferences:
+    # ArgoCD operator adds defaults to /spec on every reconcile — ignore the
+    # entire spec to avoid constant drift from operator-managed fields.
     - group: argoproj.io
       kind: ArgoCD
       jsonPointers:
         - /spec
+    # kubectl.kubernetes.io/last-applied-configuration is injected by the
+    # initial 'oc apply -f setup/bootstrap.yaml' on fresh clusters. ArgoCD
+    # subsequently manages these resources via server-side apply and does not
+    # set this annotation — causing permanent OutOfSync on the Namespace and
+    # ArgoCD CR. Ignoring it on both resource types.
+    - kind: Namespace
+      jsonPointers:
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+    - group: argoproj.io
+      kind: ArgoCD
+      jsonPointers:
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
