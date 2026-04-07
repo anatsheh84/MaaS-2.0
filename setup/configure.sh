@@ -3,26 +3,27 @@
 # configure.sh — Configure and deploy MaaS 2.0 on a new OpenShift cluster
 #
 # WHAT IT DOES:
-#   1. Logs into the cluster
-#   2. Reads all cluster-specific values via oc (infraID, AMI, domain, etc.)
+#   1. Verifies an active oc session with cluster-admin privileges
+#   2. Auto-discovers all cluster values via oc:
+#        API URL, Hosted Zone ID, AWS credentials, infraID, AMI, AZ, etc.
 #   3. Writes real values to bootstrap/values.local.yaml  ← NEVER committed
 #   4. Creates the cert-manager-aws-creds secret on the cluster
 #   5. Installs OpenShift GitOps operator and waits for it to be ready
 #   5b. Creates HTPasswd identity provider with user1, user2, admin
+#   5c. Generates LiteMaaS secrets and OAuthClient
 #   6. Grants ArgoCD cluster-admin, deploys bootstrap Application
 #   7. Patches the bootstrap Application's helm.valuesObject with real values
 #      so ArgoCD renders all templates correctly — without any git commit
 #
 # USAGE:
-#   ./setup/configure.sh \
-#     <API_URL> \
-#     <KUBEADMIN_PASSWORD> \
-#     <AWS_ACCESS_KEY_ID> \
-#     <AWS_SECRET_ACCESS_KEY> \
-#     <HOSTED_ZONE_ID>
+#   # Step 1 — log in once (the only manual step):
+#   oc login https://api.<cluster>:6443 -u kubeadmin -p <PASSWORD> --insecure-skip-tls-verify
+#
+#   # Step 2 — run with zero arguments:
+#   ./setup/configure.sh
 #
 # PREREQUISITES:
-#   - oc CLI installed and in PATH
+#   - oc CLI installed and in PATH, logged in as cluster-admin
 #   - htpasswd (from httpd-tools / apache2-utils) installed and in PATH
 #   - Run from the root of the MaaS-2.0 repo
 # =============================================================================
@@ -38,35 +39,20 @@ error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 step()    { echo -e "\n${BOLD}━━━ $* ${NC}"; }
 
 
-# ── Argument validation ────────────────────────────────────────────────────────
-if [[ $# -ne 5 ]]; then
+# ── Pre-flight checks ──────────────────────────────────────────────────────────
+if [[ $# -ne 0 ]]; then
   echo ""
   echo -e "${BOLD}Usage:${NC}"
-  echo "  ./setup/configure.sh <API_URL> <KUBEADMIN_PASSWORD> <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <HOSTED_ZONE_ID>"
+  echo "  Log in first, then run with no arguments:"
   echo ""
-  echo -e "${YELLOW}Example:${NC}"
-  echo "  ./setup/configure.sh \\"
-  echo "    https://api.cluster-abc12.abc12.sandbox123.opentlc.com:6443 \\"
-  echo "    myPassword123 \\"
-  echo "    AKIAIOSFODNN7EXAMPLE \\"
-  echo "    wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \\"
-  echo "    Z1234567890ABC"
+  echo "  oc login https://api.<cluster>:6443 -u kubeadmin -p <PASSWORD> --insecure-skip-tls-verify"
+  echo "  ./setup/configure.sh"
   echo ""
-  echo -e "${YELLOW}Where to find the values:${NC}"
-  echo "  API_URL               → RHPDS sandbox info page"
-  echo "  KUBEADMIN_PASSWORD    → RHPDS sandbox info page"
-  echo "  AWS_ACCESS_KEY_ID     → RHPDS sandbox AWS credentials"
-  echo "  AWS_SECRET_ACCESS_KEY → RHPDS sandbox AWS credentials"
-  echo "  HOSTED_ZONE_ID        → RHPDS sandbox AWS credentials"
+  echo -e "${YELLOW}All values (API URL, AWS credentials, Hosted Zone ID) are${NC}"
+  echo -e "${YELLOW}auto-discovered from the cluster — no arguments needed.${NC}"
   echo ""
   exit 1
 fi
-
-API_URL="$1"
-OC_PASSWORD="$2"
-AWS_ACCESS_KEY_ID="$3"
-AWS_SECRET_ACCESS_KEY="$4"
-HOSTED_ZONE_ID="$5"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOCAL_VALUES="$REPO_ROOT/bootstrap/values.local.yaml"
@@ -79,21 +65,25 @@ echo -e "${CYAN}${BOLD}║   MaaS 2.0 — Cluster Configuration Script   ║${NC
 echo -e "${CYAN}${BOLD}╚══════════════════════════════════════════════╝${NC}"
 
 
-# ── Step 1: Login ──────────────────────────────────────────────────────────────
-step "Step 1/7 — Login to cluster"
-info "Logging in to: $API_URL"
-oc login "$API_URL" -u kubeadmin -p "$OC_PASSWORD" --insecure-skip-tls-verify=true \
-  &>/dev/null || error "Login failed. Check API_URL and password."
-success "Logged in successfully"
+# ── Step 1: Verify active oc session ──────────────────────────────────────────
+step "Step 1/7 — Verifying oc session"
+oc whoami &>/dev/null || error "Not logged in. Run: oc login <API_URL> -u kubeadmin -p <PASSWORD> --insecure-skip-tls-verify"
+oc auth can-i '*' '*' --all-namespaces &>/dev/null || error "Current user lacks cluster-admin privileges."
+CURRENT_USER=$(oc whoami)
+success "Logged in as: $CURRENT_USER"
 
-# ── Step 2: Read cluster values ────────────────────────────────────────────────
-step "Step 2/7 — Reading cluster values"
+# ── Step 2: Auto-discover all cluster values ──────────────────────────────────
+step "Step 2/7 — Auto-discovering cluster values"
 
-INFRA_ID=$(oc get infrastructure cluster \
-  -o jsonpath='{.status.infrastructureName}')
+# API URL and domain
+API_URL=$(oc whoami --show-server | sed 's|/$||')
 API_DOMAIN=$(echo "$API_URL" | sed 's|https://||' | sed 's|:6443||' | sed 's|/$||')
 APPS_DOMAIN=$(oc get ingresses.config.openshift.io cluster \
   -o jsonpath='{.spec.domain}')
+
+# Infrastructure
+INFRA_ID=$(oc get infrastructure cluster \
+  -o jsonpath='{.status.infrastructureName}')
 REGION=$(oc get infrastructure cluster \
   -o jsonpath='{.status.platformStatus.aws.region}')
 AMI=$(oc get machineset -n openshift-machine-api \
@@ -105,17 +95,37 @@ GUID=$(oc get machineset -n openshift-machine-api \
 AZ=$(oc get machineset -n openshift-machine-api \
   -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.placement.availabilityZone}')
 
+# Hosted Zone ID — from cluster DNS config resource (no AWS CLI needed)
+HOSTED_ZONE_ID=$(oc get dns.config.openshift.io cluster \
+  -o jsonpath='{.spec.publicZone.id}')
+[[ -z "$HOSTED_ZONE_ID" ]] && error "Could not read Hosted Zone ID from dns.config.openshift.io cluster (.spec.publicZone.id is empty)"
+
+# AWS credentials — from the aws-creds secret in kube-system (RHPDS standard)
+if oc get secret aws-creds -n kube-system &>/dev/null; then
+  AWS_ACCESS_KEY_ID=$(oc get secret aws-creds -n kube-system \
+    -o jsonpath='{.data.aws_access_key_id}' | base64 -d)
+  AWS_SECRET_ACCESS_KEY=$(oc get secret aws-creds -n kube-system \
+    -o jsonpath='{.data.aws_secret_access_key}' | base64 -d)
+else
+  error "Secret aws-creds not found in kube-system. Cannot extract AWS credentials."
+fi
+[[ -z "$AWS_ACCESS_KEY_ID" ]]     && error "aws_access_key_id is empty in aws-creds secret"
+[[ -z "$AWS_SECRET_ACCESS_KEY" ]] && error "aws_secret_access_key is empty in aws-creds secret"
+
 echo ""
-echo -e "  infraID    : ${GREEN}$INFRA_ID${NC}"
-echo -e "  apiDomain  : ${GREEN}$API_DOMAIN${NC}"
-echo -e "  appsDomain : ${GREEN}$APPS_DOMAIN${NC}"
-echo -e "  region     : ${GREEN}$REGION${NC}"
-echo -e "  az         : ${GREEN}$AZ${NC}"
-echo -e "  ami        : ${GREEN}$AMI${NC}"
-echo -e "  guid       : ${GREEN}$GUID${NC}"
-echo -e "  uuid       : ${GREEN}$UUID${NC}"
+echo -e "  apiUrl      : ${GREEN}$API_URL${NC}"
+echo -e "  apiDomain   : ${GREEN}$API_DOMAIN${NC}"
+echo -e "  appsDomain  : ${GREEN}$APPS_DOMAIN${NC}"
+echo -e "  infraID     : ${GREEN}$INFRA_ID${NC}"
+echo -e "  region      : ${GREEN}$REGION${NC}"
+echo -e "  az          : ${GREEN}$AZ${NC}"
+echo -e "  ami         : ${GREEN}$AMI${NC}"
+echo -e "  guid        : ${GREEN}$GUID${NC}"
+echo -e "  uuid        : ${GREEN}$UUID${NC}"
+echo -e "  hostedZoneID: ${GREEN}$HOSTED_ZONE_ID${NC}"
+echo -e "  awsKeyId    : ${GREEN}${AWS_ACCESS_KEY_ID:0:4}...${AWS_ACCESS_KEY_ID: -4}${NC}"
 echo ""
-success "All cluster values collected"
+success "All cluster values auto-discovered"
 
 
 # ── Step 3: Write values.local.yaml (never committed) ─────────────────────────
@@ -396,7 +406,7 @@ echo -e "${GREEN}${BOLD}║   Configuration complete!                    ║${NC
 echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${YELLOW}What was done:${NC}"
-echo "  ✔  Logged into cluster ($INFRA_ID)"
+echo "  ✔  Verified oc session ($CURRENT_USER @ $INFRA_ID)"
 echo "  ✔  Collected all cluster values via oc"
 echo "  ✔  Written to bootstrap/values.local.yaml  (gitignored — never committed)"
 echo "  ✔  Created cert-manager-aws-creds secret on cluster"
@@ -415,10 +425,12 @@ echo ""
 echo "  2. ArgoCD UI:"
 echo "       https://openshift-gitops-server-openshift-gitops.$APPS_DOMAIN"
 echo ""
-echo "  3. Login to OpenShift console as:"
+echo "  3. Login to OpenShift console or LiteMaaS as:"
 echo "       user1 / MTkxNDU3   (select 'htpasswd-maas' on login screen)"
 echo "       user2 / MTkxNDU3"
 echo "       admin / NDcxOTE3"
+echo ""
+echo "       Note: passwords are the fixed RHPDS defaults (base64 of 191457 / 471917)"
 echo ""
 echo "  4. LiteMaaS portal (once wave 8 syncs):"
 echo "       https://litemaas-litemaas-test.$APPS_DOMAIN"

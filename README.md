@@ -184,7 +184,8 @@ All secrets are stored in a single Kubernetes Secret named `litemaas-secrets` in
 oc delete secret litemaas-secrets -n litemaas-test
 
 # Re-run configure.sh — Step 5c will regenerate everything
-./setup/configure.sh <API_URL> <PASSWORD> <AWS_KEY> <AWS_SECRET> <HOSTED_ZONE>
+oc login https://api.<cluster>:6443 -u kubeadmin -p <PASSWORD> --insecure-skip-tls-verify
+./setup/configure.sh
 ```
 
 **The OAuthClient** (`litemaas-oauth-client`) is also created by `configure.sh` and is NOT managed by ArgoCD — OpenShift identity/auth cluster-scoped resources cause structured merge diff errors in ArgoCD Helm charts.
@@ -314,31 +315,31 @@ Then navigate to GenAI Studio and create the playground. Creating it in any othe
 - Run from the root of the cloned repo
 - RHPDS sandbox credentials ready
 
-### One command does everything
+### One login, zero arguments
 
 ```bash
-./setup/configure.sh \
-  https://api.<new-cluster>:6443 \
-  <KUBEADMIN_PASSWORD> \
-  <AWS_ACCESS_KEY_ID> \
-  <AWS_SECRET_ACCESS_KEY> \
-  <HOSTED_ZONE_ID>
+# Step 1 — the only manual step: log in to the cluster
+oc login https://api.<new-cluster>:6443 \
+  -u kubeadmin -p <KUBEADMIN_PASSWORD> \
+  --insecure-skip-tls-verify
+
+# Step 2 — run with zero arguments
+./setup/configure.sh
 ```
 
-**That's it. No git commit needed.**
+**That's it. No git commit needed. No arguments to look up.**
 
-The script handles the full deployment end-to-end:
+The script auto-discovers everything from the live cluster:
 
 | Step | What happens |
 |------|-------------|
-| 1 | Logs into the cluster |
-| 2 | Reads all cluster values via `oc` (infraID, AMI, domain, uuid, guid, region, az) |
+| 1 | Verifies the active `oc` session has cluster-admin privileges |
+| 2 | **Auto-discovers** all values: API URL · Hosted Zone ID · AWS credentials · infraID · AMI · AZ · GUID · UUID · region |
 | 3 | Writes real values to `bootstrap/values.local.yaml` — gitignored, never committed |
 | 4 | Creates `cert-manager-aws-creds` secret on the cluster |
 | 5 | Installs OpenShift GitOps operator, grants ArgoCD cluster-admin, deploys bootstrap |
-| 5b | Creates HTPasswd IDP with `user1`, `user2`, `admin` (password: `MTkxNDU3` / `NDcxOTE3`) |
-| **5c** | **Generates LiteMaaS secrets with `openssl rand` and creates `litemaas-secrets`** |
-| **5c** | **Creates `litemaas-oauth-client` OAuthClient** |
+| 5b | Creates HTPasswd IDP with `user1`, `user2`, `admin` (fixed RHPDS passwords) |
+| 5c | Generates LiteMaaS secrets with `openssl rand`, creates `OAuthClient` |
 | 6 | Deploys bootstrap ArgoCD Application |
 | 7 | Patches the ArgoCD `helm.valuesObject` with real values — no git commit needed |
 
