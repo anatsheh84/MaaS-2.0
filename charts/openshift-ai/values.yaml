@@ -28,15 +28,8 @@ dataScienceCluster:
       workbenchNamespace: rhods-notebooks
     dashboard:
       managementState: Managed
-    # trainingoperator was renamed to trainer in RHOAI 3.3.
-    # trainer must be Managed because it installs the LeaderWorkerSet (LWS) CRD
-    # required by KServe 3.3 multi-node reconciliation. Without it all
-    # LLMInferenceServices fail with:
-    #   no matches for kind "LeaderWorkerSet" in version "leaderworkerset.x-k8s.io/v1"
-    trainer:
-      managementState: Managed
     trainingoperator:
-      managementState: Removed
+      managementState: Managed
     feastoperator: {}
     llamastackoperator:
       managementState: Removed
