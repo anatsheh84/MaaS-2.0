@@ -261,13 +261,13 @@ fi
 
 
 # ── Step 5c: Generate LiteMaaS secrets ────────────────────────────────────────
-step "Step 5c/7 — Generating LiteMaaS secrets (litemaas-test namespace)"
+step "Step 5c/7 — Generating LiteMaaS secrets (litemaas namespace)"
 #
 # All passwords are generated fresh with openssl — nothing is hardcoded.
 # The secret is created directly on the cluster and NEVER written to git.
 # ArgoCD's litemaas chart references it via existingSecret: litemaas-secrets.
 #
-LITEMAAS_NS="litemaas-test"
+LITEMAAS_NS="litemaas"
 LITEMAAS_SECRET="litemaas-secrets"
 
 oc get namespace "$LITEMAAS_NS" &>/dev/null || oc create namespace "$LITEMAAS_NS"
@@ -367,7 +367,7 @@ VALUES_PATCH=$(cat <<EOF
             "domain": "$APPS_DOMAIN"
           },
           "litemaas": {
-            "namespace": "litemaas-test",
+            "namespace": "litemaas",
             "version": "0.4.0",
             "existingSecret": "litemaas-secrets",
             "oauthClientId": "litemaas-oauth-client",
@@ -412,7 +412,7 @@ echo "  ✔  Written to bootstrap/values.local.yaml  (gitignored — never commi
 echo "  ✔  Created cert-manager-aws-creds secret on cluster"
 echo "  ✔  Installed OpenShift GitOps operator"
 echo "  ✔  Created HTPasswd users (user1, user2, admin)"
-echo "  ✔  Generated LiteMaaS secrets in litemaas-test namespace"
+echo "  ✔  Generated LiteMaaS secrets in litemaas namespace"
 echo "  ✔  Created OAuthClient for LiteMaaS"
 echo "  ✔  Deployed bootstrap ArgoCD Application"
 echo "  ✔  Patched bootstrap with real values (no git commit needed)"
@@ -433,7 +433,7 @@ echo ""
 echo "       Note: passwords are the fixed RHPDS defaults (base64 of 191457 / 471917)"
 echo ""
 echo "  4. LiteMaaS portal (once wave 8 syncs):"
-echo "       https://litemaas-litemaas-test.$APPS_DOMAIN"
+echo "       https://litemaas-litemaas.$APPS_DOMAIN"
 echo "       Login with: admin (htpasswd-maas IDP)"
 echo ""
 echo "  5. When the slack-mcp Application is deployed, create the Slack token secret:"

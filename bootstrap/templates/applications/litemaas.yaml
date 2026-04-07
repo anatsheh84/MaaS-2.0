@@ -17,7 +17,6 @@ spec:
     path: charts/litemaas
     helm:
       valuesObject:
-        # Namespace — litemaas-test for validation, change to litemaas for production
         namespace: {{ .Values.litemaas.namespace }}
 
         deployer:

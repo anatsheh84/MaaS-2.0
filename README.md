@@ -200,7 +200,7 @@ All secrets are generated at deploy-time by `configure.sh` using `openssl rand` 
 To regenerate (e.g. fresh install):
 
 ```bash
-oc delete secret litemaas-secrets -n litemaas-test
+oc delete secret litemaas-secrets -n litemaas
 oc login https://api.<cluster>:6443 -u kubeadmin -p <PASSWORD> --insecure-skip-tls-verify
 ./setup/configure.sh
 ```
@@ -223,15 +223,6 @@ Use `admin`, `user1`, or `user2` from the `htpasswd-maas` IDP — **never `kube:
 
 If your browser has an active `kube:admin` session, open an **incognito window** and select `htpasswd-maas` at the OpenShift login screen.
 
-### Namespace Promotion
-
-LiteMaaS deploys to `litemaas-test` for validation. To promote to production, change one line in `bootstrap/values.yaml` and push:
-
-```yaml
-litemaas:
-  namespace: litemaas-test   # ← change to: litemaas
-```
-
 ---
 
 ## User Guide
@@ -252,8 +243,8 @@ Select the **`htpasswd-maas`** IDP on the OpenShift login screen.
 |---|---|
 | OpenShift Console | `https://console-openshift-console.apps.<cluster-domain>` |
 | ArgoCD | `https://openshift-gitops-server-openshift-gitops.apps.<cluster-domain>` |
-| LiteMaaS | `https://litemaas-litemaas-test.apps.<cluster-domain>` |
-| LiteLLM UI | `https://litellm-litemaas-test.apps.<cluster-domain>` |
+| LiteMaaS | `https://litemaas-litemaas.apps.<cluster-domain>` |
+| LiteLLM UI | `https://litellm-litemaas.apps.<cluster-domain>` |
 | Grafana | `https://grafana.apps.<cluster-domain>` |
 | Keycloak SSO | `https://sso.apps.<cluster-domain>` |
 
