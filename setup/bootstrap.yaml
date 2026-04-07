@@ -37,6 +37,13 @@ spec:
       kind: ArgoCD
       jsonPointers:
         - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+    # The OpenShift GitOps operator owns the ArgoCD CR and clears all
+    # annotations on every reconcile — including ArgoCD's own tracking-id.
+    # Ignoring the entire annotations block prevents permanent OutOfSync.
+    - group: argoproj.io
+      kind: ArgoCD
+      jsonPointers:
+        - /metadata/annotations
   syncPolicy:
     automated:
       prune: true
