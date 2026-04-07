@@ -1,0 +1,116 @@
+---
+# Approves OLM InstallPlans for servicemeshoperator3, rhcl-operator, and
+# grafana-operator that are blocked on RHPDS clusters.
+#
+# Why this is needed:
+#   RHPDS pre-installs servicemeshoperator3 with installPlanApproval: Manual
+#   (annotation: ingress.operator.openshift.io/owned). OLM may bundle it with
+#   rhcl-operator or grafana-operator into a combined InstallPlan, blocking all
+#   CRD installation. Additionally, each operator can appear in its own standalone
+#   Manual plan. This Job runs three parallel approval loops so nothing is missed.
+#
+# Behaviour:
+#   Each loop exits cleanly if its operator is already AtLatestKnown (idempotent
+#   on re-deploys). All loops run in parallel; the Job waits for all three.
+#   BeforeHookCreation ensures a fresh run on every sync.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: approve-installplans
+  namespace: openshift-operators
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 660
+  template:
+    spec:
+      serviceAccountName: installplan-approver
+      restartPolicy: OnFailure
+      containers:
+      - name: approver
+        image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -euo pipefail
+
+          # Approve any pending InstallPlan containing a given CSV name.
+          # Args: $1 = operator name (for logging), $2 = CSV substring to match
+          approve_operator() {
+            local OPERATOR="$1"
+            local CSV_MATCH="$2"
+
+            # Exit immediately if already fully installed (idempotent on re-deploys)
+            local STATE
+            STATE=$(oc get subscription -n openshift-operators -o json 2>/dev/null \
+              | jq -r --arg csv "$CSV_MATCH" '
+                  .items[]
+                  | select(.status.currentCSV // "" | contains($csv))
+                  | .status.state // ""
+                ' | head -1 || true)
+
+            if [ "$STATE" = "AtLatestKnown" ]; then
+              echo "[$OPERATOR] Already AtLatestKnown — nothing to do."
+              return 0
+            fi
+
+            echo "[$OPERATOR] Watching for pending InstallPlan (CSV contains: $CSV_MATCH)..."
+            for i in $(seq 1 60); do
+              local PLAN
+              PLAN=$(oc get installplan -n openshift-operators -o json 2>/dev/null \
+                | jq -r --arg csv "$CSV_MATCH" '
+                    .items[]
+                    | select(.spec.approved == false)
+                    | select(.spec.clusterServiceVersionNames[]
+                        | contains($csv))
+                    | .metadata.name
+                  ' 2>/dev/null | head -1 || true)
+
+              if [ -n "$PLAN" ]; then
+                echo "[$OPERATOR] Approving InstallPlan: $PLAN"
+                oc patch installplan "$PLAN" -n openshift-operators \
+                  --type=merge -p '{"spec":{"approved":true}}'
+                echo "[$OPERATOR] Approved successfully."
+                return 0
+              fi
+
+              # Re-check state — may have been approved externally
+              STATE=$(oc get subscription -n openshift-operators -o json 2>/dev/null \
+                | jq -r --arg csv "$CSV_MATCH" '
+                    .items[]
+                    | select(.status.currentCSV // "" | contains($csv))
+                    | .status.state // ""
+                  ' | head -1 || true)
+              if [ "$STATE" = "AtLatestKnown" ]; then
+                echo "[$OPERATOR] Reached AtLatestKnown — approved externally."
+                return 0
+              fi
+
+              echo "[$OPERATOR] Attempt $i/60: no pending plan yet, retrying in 10s..."
+              sleep 10
+            done
+
+            echo "[$OPERATOR] WARNING: timed out waiting for InstallPlan."
+            return 1
+          }
+
+          # Run all three approval loops in parallel
+          approve_operator "servicemeshoperator3" "servicemeshoperator3" &
+          PID_SM=$!
+
+          approve_operator "rhcl-operator" "rhcl-operator" &
+          PID_RHCL=$!
+
+          approve_operator "grafana-operator" "grafana-operator" &
+          PID_GRAFANA=$!
+
+          # Wait for all and collect exit codes
+          RC=0
+          wait $PID_SM     || { echo "[servicemeshoperator3] loop failed"; RC=1; }
+          wait $PID_RHCL   || { echo "[rhcl-operator] loop failed";        RC=1; }
+          wait $PID_GRAFANA || { echo "[grafana-operator] loop failed";     RC=1; }
+
+          exit $RC

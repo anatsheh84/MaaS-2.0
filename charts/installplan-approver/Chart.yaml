@@ -1,0 +1,16 @@
+apiVersion: v2
+name: installplan-approver
+description: >
+  Automatically approves OLM InstallPlans blocked on RHPDS clusters.
+  RHPDS pre-installs servicemeshoperator3 with installPlanApproval: Manual
+  (annotation: ingress.operator.openshift.io/owned). When OLM resolves
+  dependencies for rhcl-operator (Kuadrant) or grafana-operator it may bundle
+  servicemeshoperator3 into the same InstallPlan, causing the entire plan to
+  require manual approval. Additionally, grafana-operator can appear in its
+  own standalone Manual plan, and servicemeshoperator3 can have its own
+  independent Manual plan.
+  This chart runs a single Job with three parallel approval loops — one each
+  for servicemeshoperator3, rhcl-operator, and grafana-operator — so all CRDs
+  install automatically on every fresh cluster without manual intervention.
+type: application
+version: 0.2.0

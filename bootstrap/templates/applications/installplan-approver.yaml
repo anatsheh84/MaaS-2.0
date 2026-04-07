@@ -1,11 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: rhcl-installplan-approver
+  name: installplan-approver
   namespace: openshift-gitops
   annotations:
-    # Wave 4 — same wave as rhcl-operator so the approver Job is ready
-    # the moment OLM creates the combined install plan.
+    # Wave 4 — same wave as rhcl-operator, rhcl-operator, and grafana so the
+    # approver Job is running the moment OLM creates any pending InstallPlan.
     argocd.argoproj.io/sync-wave: "4"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -14,7 +14,7 @@ spec:
   source:
     repoURL: {{ .Values.bootstrap.repoURL }}
     targetRevision: {{ .Values.bootstrap.targetRevision }}
-    path: charts/rhcl-installplan-approver
+    path: charts/installplan-approver
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-operators
