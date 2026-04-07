@@ -35,15 +35,19 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-machine-api
-  # ignoreDifferences on spec.replicas for all MachineSets so that scaling
-  # via the OpenShift GUI or 'oc scale' is not reverted by ArgoCD selfHeal.
-  # ArgoCD still owns the MachineSet definition (instance type, AZ, tags,
-  # taints, etc.) — only the replica count is left to the user/autoscaler.
+  # ignoreDifferences keeps ArgoCD from fighting over fields it should not own:
+  #   /spec/replicas          — scaling is managed by the user or cluster autoscaler
+  #   machine.openshift.io/GPU, memoryMb, vCPU annotations — capacity hints set by
+  #                             the machine-api operator; vary per cluster/instance
+  #                             type and have no effect on provisioning correctness.
   ignoreDifferences:
     - group: machine.openshift.io
       kind: MachineSet
       jsonPointers:
         - /spec/replicas
+        - /metadata/annotations/machine.openshift.io~1GPU
+        - /metadata/annotations/machine.openshift.io~1memoryMb
+        - /metadata/annotations/machine.openshift.io~1vCPU
   syncPolicy:
     automated:
       prune: true
