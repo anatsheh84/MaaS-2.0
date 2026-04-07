@@ -9,10 +9,6 @@ metadata:
     app: {{ .name }}
     app.kubernetes.io/name: {{ include "model-registry.postgresServiceName" .name }}
     app.kubernetes.io/part-of: {{ .name }}
-  annotations:
-    # Wave 1 — same wave as PVC and Deployment. Service must exist before
-    # the Deployment pod starts so DNS resolves immediately on first boot.
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   selector:
     app: {{ .name }}
