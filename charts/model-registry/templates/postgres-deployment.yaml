@@ -12,8 +12,10 @@ metadata:
     app.kubernetes.io/part-of: {{ $name }}
     component: {{ include "model-registry.postgresServiceName" $name }}
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
-    template.alpha.openshift.io/wait-for-ready: "true"
+    # Wave 1 — same wave as PVC and Service so the pod can mount the volume
+    # and the DNS name resolves on first boot. ModelRegistry CR is wave 2
+    # and waits for this Deployment to be healthy before applying.
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   revisionHistoryLimit: 0
