@@ -3,7 +3,7 @@
 # configure.sh — Configure and deploy MaaS 2.0 on a new OpenShift cluster
 #
 # WHAT IT DOES:
-#   1. Verifies an active oc session with cluster-admin privileges
+#   1. Verifies  an active oc session with cluster-admin privileges
 #   2. Auto-discovers all cluster values via oc:
 #        API URL, Hosted Zone ID, AWS credentials, infraID, AMI, AZ, etc.
 #   3. Writes real values to bootstrap/values.local.yaml  ← NEVER committed
