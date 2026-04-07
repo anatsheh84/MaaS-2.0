@@ -11,9 +11,11 @@ metadata:
   annotations:
     # Wave 1 — same wave as Deployment and Service.
     # gp3-csi uses WaitForFirstConsumer: the PVC only binds when a Pod
-    # mounts it. Keeping PVC in a prior wave causes a deadlock because
-    # ArgoCD waits for Bound before creating the Deployment (the consumer).
+    # mounts it. SkipHealthCheck prevents ArgoCD from blocking within
+    # wave 1 waiting for Bound — the Deployment (also wave 1) provides
+    # the consumer pod that causes the volume to bind.
     argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipHealthCheck=true
 spec:
   accessModes:
     - ReadWriteOnce
