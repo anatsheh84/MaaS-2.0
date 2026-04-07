@@ -18,14 +18,23 @@ workers:
 # replicas is ignored by ArgoCD (see Application ignoreDifferences) so nodes
 # can be scaled freely from the OpenShift GUI or oc scale without being reverted.
 # Set replicas: 0 for types you want available but not running by default.
+#
+# gpu      — number of GPUs per node (used in machine.openshift.io/GPU annotation)
+# memoryMb — total node RAM in MiB   (used in machine.openshift.io/memoryMb annotation)
+#            These must match the actual instance spec so the cluster autoscaler
+#            reports correct capacity. Wrong values cause permanent ArgoCD OutOfSync.
 gpuSets:
-  - instanceType: g6e.2xlarge   # NVIDIA L40S — 1 GPU, 46GB VRAM, 32 vCPU
+  - instanceType: g6e.2xlarge   # NVIDIA L40S — 1 GPU, 46GB VRAM, 8 vCPU, 32GB RAM
     az: ""
     replicas: 1
+    gpu: "1"
     vCPU: "8"
+    memoryMb: "32768"
     volumeSize: 250
-  - instanceType: g6e.12xlarge  # NVIDIA L40S — 4 GPU, 184GB VRAM, 48 vCPU
+  - instanceType: g6e.12xlarge  # NVIDIA L40S — 4 GPU, 184GB VRAM, 48 vCPU, 384GB RAM
     az: ""
     replicas: 0
+    gpu: "4"
     vCPU: "48"
+    memoryMb: "393216"
     volumeSize: 500
