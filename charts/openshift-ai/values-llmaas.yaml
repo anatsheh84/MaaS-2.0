@@ -2,6 +2,8 @@ dataScienceCluster:
   components:
     llamastackoperator:
       managementState: Managed
+    # trainer: Managed is set in values.yaml — required for LWS CRD in RHOAI 3.3.
+    # trainingoperator is the old name (pre-3.3), kept Removed for safety.
     trainingoperator:
       managementState: Removed
 
