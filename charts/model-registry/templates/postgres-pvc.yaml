@@ -9,6 +9,10 @@ metadata:
     app: {{ .name }}
     app.kubernetes.io/part-of: {{ .name }}
   annotations:
+    # Wave 1 — same wave as Deployment and Service.
+    # gp3-csi uses WaitForFirstConsumer: the PVC only binds when a Pod
+    # mounts it. Keeping PVC in a prior wave causes a deadlock because
+    # ArgoCD waits for Bound before creating the Deployment (the consumer).
     argocd.argoproj.io/sync-wave: "1"
 spec:
   accessModes:
