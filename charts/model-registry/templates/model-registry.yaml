@@ -11,6 +11,10 @@ metadata:
     app.kubernetes.io/part-of: {{ .name }}
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    # Wave 2 — after Postgres PVC/Deployment/Service (wave 1) are healthy.
+    # The ModelRegistry rest-container connects to Postgres on startup;
+    # applying this CR before Postgres is ready causes CrashLoopBackOff.
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   grpc:
     port: 9090
