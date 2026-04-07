@@ -20,16 +20,16 @@ spec:
         uuid: "{{ .Values.aws.uuid }}"
         workers:
           - az: {{ .Values.aws.az }}
-            replicas: 5
+            replicas: 3
         gpuSets:
           - instanceType: g6e.2xlarge
             az: {{ .Values.aws.az }}
-            replicas: 1
+            replicas: 0
             vCPU: "8"
             volumeSize: 250
           - instanceType: g6e.12xlarge
             az: {{ .Values.aws.az }}
-            replicas: 0
+            replicas: 1
             vCPU: "48"
             volumeSize: 500
   destination:
@@ -37,6 +37,8 @@ spec:
     namespace: openshift-machine-api
   # ignoreDifferences keeps ArgoCD from fighting over fields it should not own:
   #   /spec/replicas          — scaling is managed by the user or cluster autoscaler
+  #                             after initial provisioning. These replica counts only
+  #                             apply on first sync of a fresh cluster.
   #   machine.openshift.io/GPU, memoryMb, vCPU annotations — capacity hints set by
   #                             the machine-api operator; vary per cluster/instance
   #                             type and have no effect on provisioning correctness.
