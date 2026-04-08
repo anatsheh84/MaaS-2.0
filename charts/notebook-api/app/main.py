@@ -200,18 +200,22 @@ async def upload_document(
     file_id = ls_file["id"]
 
     # Attach to vector store in background (chunking + embedding can take minutes)
-    async def _attach():
+    # Using sync wrapper because FastAPI BackgroundTasks doesn't reliably await async functions
+    def _attach_sync():
+        import asyncio
         try:
-            result = await llamastack_client.attach_file_to_vector_store(
-                notebook_id, file_id,
+            loop = asyncio.new_event_loop()
+            result = loop.run_until_complete(
+                llamastack_client.attach_file_to_vector_store(notebook_id, file_id)
             )
+            loop.close()
             if result.get("status") == "failed":
                 error_msg = result.get("last_error", {}).get("message", "Unknown")
                 logger.error("Attach failed for %s: %s", file_id, error_msg)
         except Exception:
             logger.exception("Background attach failed for file %s", file_id)
 
-    background_tasks.add_task(_attach)
+    background_tasks.add_task(_attach_sync)
     return {"file_id": file_id, "filename": filename, "status": "accepted"}
 
 
@@ -275,12 +279,11 @@ async def chat(
     username = _get_username(x_forwarded_user)
     logger.info("Chat: user=%s notebook=%s model=%s", username, notebook_id, body.model)
 
-    # Map model name to LlamaStack provider model ID
-    # The UI sends short names like "qwen3-4b-instruct"
-    # LlamaStack needs "maas-vllm-inference-1/qwen3-4b-instruct"
-    model_id = body.model
-    if model_id and "/" not in model_id:
-        model_id = f"maas-vllm-inference-1/{model_id}"
+    # LlamaStack only has one inference provider (maas-vllm-inference-1 → Qwen).
+    # Always use the configured default model for the Responses API.
+    # The model selector in the UI is informational — multi-model support requires
+    # registering additional providers in the LlamaStack ConfigMap.
+    model_id = None  # will use settings.llamastack_model_id default
 
     async def stream_gen():
         """Convert Responses API events to OpenAI chat.completions streaming format.
@@ -315,12 +318,18 @@ async def chat(
                     }
                     yield f"data: {_json.dumps(compat)}\n\n"
 
-            # Forward errors
-            elif event_type == "response.completed":
+            # Forward errors from failed or completed responses
+            elif event_type in ("response.failed", "response.completed"):
                 resp = event.get("response", {})
                 if resp.get("error"):
-                    err = {"error": resp["error"]}
-                    yield f"data: {_json.dumps(err)}\n\n"
+                    error_msg = resp["error"].get("message", "Unknown error")
+                    compat = {
+                        "choices": [{
+                            "index": 0,
+                            "delta": {"content": f"\n\n⚠️ Error: {error_msg}"},
+                        }],
+                    }
+                    yield f"data: {_json.dumps(compat)}\n\n"
 
         yield "data: [DONE]\n\n"
 
