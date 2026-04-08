@@ -129,7 +129,6 @@ async def responses_stream(
     query: str,
     vector_store_ids: list[str],
     model: str | None = None,
-    instructions: str | None = None,
 ) -> AsyncIterator[str]:
     """Stream a response from the LlamaStack Responses API with file_search.
 
@@ -138,17 +137,12 @@ async def responses_stream(
     Yields SSE-compatible JSON chunks (OpenAI streaming format).
     """
     model_id = model or settings.llamastack_model_id
-    system_instructions = instructions or (
-        "You are a helpful research assistant. Answer the user's question "
-        "using the document context retrieved via file search. "
-        "Cite specific passages when possible. "
-        "If the retrieved context does not contain enough information, say so."
-    )
 
+    # NOTE: Do NOT send 'instructions' — LlamaStack v0.3.5 skips file_search
+    # when instructions are provided. The model uses retrieved context automatically.
     payload = {
         "model": model_id,
         "input": query,
-        "instructions": system_instructions,
         "stream": True,
         "tools": [
             {
@@ -186,20 +180,15 @@ async def responses_sync(
     query: str,
     vector_store_ids: list[str],
     model: str | None = None,
-    instructions: str | None = None,
 ) -> dict:
     """Non-streaming response for simple queries or fallback."""
     model_id = model or settings.llamastack_model_id
-    system_instructions = instructions or (
-        "You are a helpful research assistant. Answer the user's question "
-        "using the document context retrieved via file search. "
-        "Cite specific passages when possible."
-    )
 
+    # NOTE: Do NOT send 'instructions' — LlamaStack v0.3.5 skips file_search
+    # when instructions are provided. The model uses retrieved context automatically.
     payload = {
         "model": model_id,
         "input": query,
-        "instructions": system_instructions,
         "tools": [
             {
                 "type": "file_search",
