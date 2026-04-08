@@ -4,7 +4,7 @@
 
 namespace: maas-rag
 
-image: quay.io/maas/notebook-ui:latest
+image: quay.io/anatsheh84/notebook-ui:latest
 replicas: 1
 
 # Backend API base URL — the nginx reverse-proxies /api to the backend

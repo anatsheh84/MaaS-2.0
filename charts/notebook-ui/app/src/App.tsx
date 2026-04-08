@@ -297,7 +297,7 @@ export const App: React.FC = () => {
   // ── Render ──
   return (
     <Page>
-      <PageSection variant="light">
+      <PageSection variant="default">
         <Title headingLevel="h1" size="2xl">
           <BookOpenIcon /> NotebookLM
         </Title>
