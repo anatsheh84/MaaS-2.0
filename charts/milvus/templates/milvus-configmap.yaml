@@ -27,6 +27,12 @@ data:
     common:
       storageType: remote
 
+    mq:
+      type: rocksmq
+
+    rocksmq:
+      path: /var/lib/milvus/rdb_data
+
     proxy:
       port: 19530
 
