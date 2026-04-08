@@ -202,9 +202,11 @@ async def upload_document(
     ls_file = await llamastack_client.upload_file(filename, file_bytes)
     file_id = ls_file["id"]
 
-    # Attach to vector store in background (chunking + embedding can take minutes)
-    # Using synchronous httpx client to avoid asyncio event loop conflicts in threads
-    def _attach_sync():
+    # Attach to vector store in a separate thread (chunking + embedding can take minutes)
+    # FastAPI BackgroundTasks runs serially and blocks — use a thread instead
+    import threading
+
+    def _attach_thread():
         import httpx as sync_httpx
         try:
             logger.info("Background attach starting: file=%s vs=%s", file_id, notebook_id)
@@ -223,7 +225,7 @@ async def upload_document(
         except Exception:
             logger.exception("Background attach failed for file %s", file_id)
 
-    background_tasks.add_task(_attach_sync)
+    threading.Thread(target=_attach_thread, daemon=True).start()
     return {"file_id": file_id, "filename": filename, "status": "accepted"}
 
 
