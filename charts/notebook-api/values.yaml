@@ -18,7 +18,7 @@ doclingUrl: ""
 maxChunkSize: 512
 chunkOverlap: 50
 topKResults: 5
-scoreThreshold: "0.75"
+scoreThreshold: "0.35"
 
 # Route
 deployer:

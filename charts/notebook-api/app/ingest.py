@@ -38,7 +38,6 @@ def _chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
         if len(text) <= chunk_size:
             return [text] if text.strip() else []
         if not seps:
-            # No separators left — hard-split
             result = []
             for i in range(0, len(text), chunk_size - overlap):
                 piece = text[i : i + chunk_size]
@@ -48,14 +47,12 @@ def _chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
 
         sep = seps[0]
         remaining_seps = seps[1:]
-
         if sep == "":
             return _split(text, remaining_seps)
 
         parts = text.split(sep)
         current = ""
         result = []
-
         for part in parts:
             candidate = f"{current}{sep}{part}" if current else part
             if len(candidate) <= chunk_size:
@@ -69,20 +66,16 @@ def _chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
                     current = part
                     continue
                 current = ""
-
         if current.strip():
             result.append(current)
         return result
 
     raw_chunks = _split(text, separators)
-
-    # Apply overlap by including tail of previous chunk
     for i, chunk in enumerate(raw_chunks):
         if i > 0 and overlap > 0:
             prev_tail = raw_chunks[i - 1][-overlap:]
             chunk = prev_tail + chunk
         chunks.append(chunk.strip())
-
     return [c for c in chunks if c]
 
 
@@ -98,7 +91,40 @@ async def _extract_text_docling(file_bytes: bytes, filename: str) -> str:
 
 
 def _extract_text_basic(file_bytes: bytes, filename: str) -> str:
-    """Basic text extraction fallback — handles plain text and common formats."""
+    """Extract text from PDF, DOCX, or plain text files."""
+    fname = filename.lower()
+
+    # PDF extraction via pypdf
+    if fname.endswith(".pdf"):
+        try:
+            import io
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(file_bytes))
+            pages = [page.extract_text() or "" for page in reader.pages]
+            text = "\n\n".join(p for p in pages if p.strip())
+            if text.strip():
+                logger.info("PDF extracted: %d pages, %d chars", len(reader.pages), len(text))
+                return text
+            logger.warning("PDF extraction yielded no text — may be scanned/image-only")
+        except Exception as e:
+            logger.warning("PDF extraction failed: %s", e)
+
+    # DOCX extraction via python-docx
+    if fname.endswith(".docx"):
+        try:
+            import io
+            from docx import Document
+            doc = Document(io.BytesIO(file_bytes))
+            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+            text = "\n\n".join(paragraphs)
+            if text.strip():
+                logger.info("DOCX extracted: %d paragraphs, %d chars", len(paragraphs), len(text))
+                return text
+            logger.warning("DOCX extraction yielded no text")
+        except Exception as e:
+            logger.warning("DOCX extraction failed: %s", e)
+
+    # Plain text fallback
     try:
         return file_bytes.decode("utf-8")
     except UnicodeDecodeError:
@@ -118,7 +144,6 @@ def _ensure_collection(notebook_id: str) -> Collection:
     """Create Milvus collection if it doesn't exist."""
     col_name = _collection_name(notebook_id)
     connections.connect(alias="default", uri=settings.milvus_uri)
-
     if utility.has_collection(col_name):
         return Collection(col_name)
 
@@ -186,10 +211,7 @@ async def ingest_document(notebook_id: str, doc_id: str, filename: str, file_byt
         # 4. Upsert into Milvus
         ingest_status[status_key]["status"] = "upserting"
         collection = _ensure_collection(notebook_id)
-
-        ids = [
-            hashlib.sha256(f"{doc_id}:{i}".encode()).hexdigest()[:16] for i in range(total_chunks)
-        ]
+        ids = [hashlib.sha256(f"{doc_id}:{i}".encode()).hexdigest()[:16] for i in range(total_chunks)]
         collection.insert([ids, chunks, [doc_id] * total_chunks, all_embeddings])
         collection.flush()
         collection.load()
