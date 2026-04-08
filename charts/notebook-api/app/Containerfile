@@ -1,8 +1,8 @@
 FROM registry.access.redhat.com/ubi9/python-311:latest
 
 COPY requirements.txt /opt/app-root/src/
-RUN pip install --no-cache-dir setuptools && \
-    pip install --no-cache-dir -r /opt/app-root/src/requirements.txt
+RUN pip install --no-cache-dir -r /opt/app-root/src/requirements.txt && \
+    pip install --no-cache-dir "setuptools<81"
 
 COPY . /opt/app-root/src/app/
 
