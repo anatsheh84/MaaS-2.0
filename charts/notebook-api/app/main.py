@@ -13,11 +13,6 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="NotebookLM RAG API", version="0.1.0")
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Pre-fetch LlamaStack model map so first chat request resolves immediately."""
-    await llamastack_client._build_model_map()
-
 # In-memory notebook store — sufficient for demo
 notebooks: dict[str, dict] = {}
 

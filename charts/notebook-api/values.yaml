@@ -8,7 +8,7 @@ image: image-registry.openshift-image-registry.svc:5000/maas-rag/notebook-api:la
 replicas: 1
 
 # Upstream service URLs — defaults assume all services in maas-rag namespace
-llamastackUrl: "http://llamastack:8321"
+maasBaseUrl: "https://maas.apps.cluster.local"
 milvusUri: "http://milvus.maas-rag.svc:19530"
 embedEndpoint: "http://nomic-embed-predictor.maas-rag.svc/v1"
 embedModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"

@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/part-of: notebook-api
     app.kubernetes.io/managed-by: Helm
 data:
-  LLAMASTACK_URL: {{ .Values.llamastackUrl | quote }}
+  MAAS_BASE_URL: {{ .Values.maasBaseUrl | quote }}
   MILVUS_URI: {{ .Values.milvusUri | quote }}
   EMBED_ENDPOINT: {{ .Values.embedEndpoint | quote }}
   EMBED_MODEL: {{ .Values.embedModel | quote }}

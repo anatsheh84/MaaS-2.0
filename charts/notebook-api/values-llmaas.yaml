@@ -1,8 +1,7 @@
 namespace: maas-rag
-# LlamaStack URL — set to the first available shared instance after deploy
-# Pattern: http://{distribution-name}-service.{namespace}.svc.cluster.local:8321
-# Discovery: oc get LlamaStackDistribution -A
-llamastackUrl: "http://lsd-genai-playground-service.wksp-user1.svc.cluster.local:8321"
+# MaaS gateway — direct OpenAI-compatible inference, same pattern as LiteMaaS
+maasBaseUrl: "https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com"
+# Token injected from maas-gateway-token secret (created by configure.sh post-deploy)
 milvusUri: "http://milvus.maas-rag.svc.cluster.local:19530"
 embedEndpoint: ""
 embedModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
