@@ -26,8 +26,8 @@ deployer:
 
 resources:
   requests:
-    cpu: 250m
-    memory: 256Mi
+    cpu: "4"
+    memory: 10Gi
   limits:
-    cpu: "1"
-    memory: 1Gi
+    cpu: "4"
+    memory: 10Gi
