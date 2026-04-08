@@ -11,7 +11,7 @@ metadata:
 spec:
   host: notebook.{{ .Values.deployer.domain }}
   port:
-    targetPort: http
+    targetPort: oauth
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect

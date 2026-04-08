@@ -3,7 +3,8 @@ import uuid
 
 import httpx
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, UploadFile
+from typing import Optional
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -16,6 +17,10 @@ app = FastAPI(title="NotebookLM RAG API", version="2.0.0")
 
 # In-memory notebook store: {notebook_id: {name, vector_store_id, documents}}
 notebooks: dict[str, dict] = {}
+
+# Per-user MaaS token cache: {username: {token, expires_at}}
+# Avoids a K8s TokenRequest API call on every chat message.
+_token_cache: dict[str, dict] = {}
 
 
 class NotebookCreate(BaseModel):
@@ -169,14 +174,33 @@ async def list_documents(notebook_id: str):
 
 
 @app.post("/notebooks/{notebook_id}/chat")
-async def chat(notebook_id: str, body: ChatRequest):
+async def chat(
+    notebook_id: str,
+    body: ChatRequest,
+    x_forwarded_user: Optional[str] = Header(default=None),
+):
     nb = notebooks.get(notebook_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
     vector_store_id = nb.get("vector_store_id", "")
 
+    # Resolve MaaS gateway token — prefer per-user token when authenticated
+    maas_token = llamastack_client.settings.maas_token  # shared fallback
+    if x_forwarded_user:
+        user_token = await _get_cached_user_token(x_forwarded_user)
+        if user_token:
+            maas_token = user_token
+            logger.info("Chat: using per-user token for %s", x_forwarded_user)
+        else:
+            logger.warning(
+                "Chat: no MaaS SA found for user %s — falling back to shared token",
+                x_forwarded_user,
+            )
+
     async def stream_gen():
-        async for chunk in llamastack_client.chat_stream(vector_store_id, body.query, body.model):
+        async for chunk in llamastack_client.chat_stream(
+            vector_store_id, body.query, body.model, maas_token=maas_token
+        ):
             yield f"data: {chunk}\n\n"
         yield "data: [DONE]\n\n"
 
@@ -206,6 +230,33 @@ _TIER_NAMESPACES = [
 ]
 _MAAS_AUDIENCE = "maas-default-gateway-sa"
 _TOKEN_TTL = 3600  # 1 hour
+
+
+async def _get_cached_user_token(username: str) -> str | None:
+    """
+    Return a cached MaaS token for username, refreshing if within 5 min of expiry.
+    This avoids a K8s TokenRequest API call on every single chat message.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    cached = _token_cache.get(username)
+    if cached:
+        expires_at = datetime.fromisoformat(cached["expires"].replace("Z", "+00:00"))
+        # Refresh 5 minutes before expiry
+        if expires_at - datetime.now(timezone.utc) > timedelta(minutes=5):
+            return cached["token"]
+        logger.debug("Token for %s near expiry, refreshing", username)
+
+    result = await _get_user_maas_token(username)
+    if result:
+        _token_cache[username] = {
+            "token": result["token"],
+            "expires": result["expires"],
+            "tier": result["tier"],
+        }
+        return result["token"]
+    return None
+
 
 
 async def _get_user_maas_token(username: str) -> dict | None:

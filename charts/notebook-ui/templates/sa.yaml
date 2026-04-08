@@ -1,0 +1,17 @@
+# ServiceAccount for notebook-ui
+# The oauth-redirectreference annotation tells OpenShift OAuth
+# to automatically use this SA as the OAuthClient, redirecting
+# back to the notebook-ui route after login — no separate OAuthClient needed.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: notebook-ui
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: notebook-ui
+    app.kubernetes.io/part-of: notebook-ui
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.primary: >-
+      {"kind":"OAuthRedirectReference","apiVersion":"v1",
+       "reference":{"kind":"Route","name":"notebook-ui"}}

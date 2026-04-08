@@ -12,6 +12,12 @@ spec:
   selector:
     app: notebook-ui
   ports:
+  # oauth-proxy port — this is what the Route points to
+  - name: oauth
+    port: 4180
+    targetPort: 4180
+    protocol: TCP
+  # nginx port — internal only, oauth-proxy upstream
   - name: http
     port: 8080
     targetPort: 8080

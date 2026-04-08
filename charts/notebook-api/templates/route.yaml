@@ -1,22 +1,4 @@
-{{- if .Values.deployer.domain }}
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: notebook-api
-  namespace: {{ .Values.namespace }}
-  labels:
-    app: notebook-api
-    app.kubernetes.io/part-of: notebook-api
-    app.kubernetes.io/managed-by: Helm
-spec:
-  host: notebook-api.{{ .Values.deployer.domain }}
-  port:
-    targetPort: http
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Redirect
-  to:
-    kind: Service
-    name: notebook-api
-    weight: 100
-{{- end }}
+# notebook-api has NO public route.
+# It is only accessible internally via the notebook-ui nginx proxy at /api/
+# This prevents external callers from spoofing X-Forwarded-User
+# or directly calling /user-token/{username} to harvest MaaS tokens.

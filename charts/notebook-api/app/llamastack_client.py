@@ -60,7 +60,7 @@ async def _retrieve_context(vector_store_id: str, query: str) -> list[str]:
         return []
 
 
-async def chat_stream(vector_store_id: str, query: str, model: str) -> AsyncIterator[str]:
+async def chat_stream(vector_store_id: str, query: str, model: str, maas_token: str | None = None) -> AsyncIterator[str]:
     """Retrieve context from LlamaStack, stream chat via MaaS gateway."""
 
     context_chunks = await _retrieve_context(vector_store_id, query)
@@ -86,7 +86,9 @@ async def chat_stream(vector_store_id: str, query: str, model: str) -> AsyncIter
     ]
 
     url = f"{settings.maas_base_url}/llm/{model}/v1/chat/completions"
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings.maas_token}"}
+    # Use per-user token if provided, fall back to shared token
+    token = maas_token or settings.maas_token
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
     logger.info("Chat: model=%s vs=%s", model, vector_store_id)
 
     async with httpx.AsyncClient(timeout=120.0) as client:

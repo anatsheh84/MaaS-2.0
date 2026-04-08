@@ -377,6 +377,24 @@ oc start-build notebook-api -n "$MAAS_RAG_NS" 2>/dev/null || true
 oc start-build notebook-ui  -n "$MAAS_RAG_NS" 2>/dev/null || true
 success "Builds started — monitor with: oc get builds -n $MAAS_RAG_NS"
 
+# ── Step 5e: Create notebook-ui oauth-proxy secret ────────────────────────────
+step "Step 5e/7 — Creating notebook-ui oauth-proxy session secret"
+
+if oc get secret notebook-ui-proxy -n "$MAAS_RAG_NS" &>/dev/null; then
+  warn "Secret notebook-ui-proxy already exists in $MAAS_RAG_NS — skipping"
+else
+  # Generate cryptographically random 32-byte cookie secret
+  # This is used by oauth-proxy to sign session cookies
+  COOKIE_SECRET=$(openssl rand -base64 32 | tr -d '\n=')
+
+  oc create secret generic notebook-ui-proxy \
+    --from-literal=session_secret="$COOKIE_SECRET" \
+    -n "$MAAS_RAG_NS"
+  success "notebook-ui-proxy secret created (cookie secret: ${#COOKIE_SECRET} chars)"
+fi
+
+
+
 
 # ── Step 6: Deploy bootstrap Application ──────────────────────────────────────
 step "Step 6/7 — Deploying ArgoCD bootstrap Application"

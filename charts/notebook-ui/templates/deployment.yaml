@@ -23,7 +23,46 @@ spec:
         app.kubernetes.io/name: notebook-ui
         app.kubernetes.io/part-of: notebook-ui
     spec:
+      serviceAccountName: notebook-ui
       containers:
+      # ── oauth-proxy sidecar ──────────────────────────────────────────────
+      # Sits in front of nginx. All external traffic enters here on port 4180.
+      # Validates the OpenShift session cookie, redirects to OpenShift OAuth
+      # if unauthenticated, then proxies to nginx on 8080 with X-Forwarded-User.
+      - name: oauth-proxy
+        image: image-registry.openshift-image-registry.svc:5000/openshift/oauth-proxy:v4.4
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: oauth
+          containerPort: 4180
+          protocol: TCP
+        args:
+        - --provider=openshift
+        - --https-address=
+        - --http-address=:4180
+        - --upstream=http://localhost:8080
+        - --openshift-service-account=notebook-ui
+        - --cookie-secret-file=/etc/proxy/secrets/session_secret
+        - --cookie-secure=true
+        - --cookie-httponly=true
+        - --pass-user-headers=true
+        - --skip-auth-regex=^/healthz
+        - --openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - --email-domain=*
+        volumeMounts:
+        - name: proxy-secret
+          mountPath: /etc/proxy/secrets
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+
+      # ── nginx container ──────────────────────────────────────────────────
+      # Only reachable from oauth-proxy (localhost:8080). Not exposed externally.
       - name: notebook-ui
         image: {{ .Values.image }}
         imagePullPolicy: Always
@@ -61,3 +100,6 @@ spec:
       - name: nginx-config
         configMap:
           name: notebook-ui-nginx
+      - name: proxy-secret
+        secret:
+          secretName: notebook-ui-proxy
