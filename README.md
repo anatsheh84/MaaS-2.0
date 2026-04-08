@@ -18,6 +18,11 @@ GitOps bootstrap for a **Model-as-a-Service (MaaS)** platform on OpenShift — m
 - `htpasswd` installed (`httpd-tools` on RHEL/Fedora, `apache2-utils` on Debian/Ubuntu)
 - Run from the root of the cloned repo
 
+That's it. No container runtime, no registry credentials, no cloud CLI needed.
+All values are auto-discovered from the live cluster. Container images for the
+RAG Notebook service are built directly on OpenShift using its built-in build
+service — nothing runs locally.
+
 ### Deploy
 
 Log in once, then run with zero arguments — everything else is auto-discovered:
@@ -32,7 +37,8 @@ oc login https://api.<cluster>:6443 \
 ./setup/configure.sh
 ```
 
-The script auto-discovers all values from the live cluster (API URL, AWS credentials, Hosted Zone ID, infraID, AMI, AZ, region) and handles the full deployment:
+The script auto-discovers all values from the live cluster (API URL, AWS credentials,
+Hosted Zone ID, infraID, AMI, AZ, region) and handles the full deployment:
 
 | Step | What happens |
 |------|-------------|
@@ -43,10 +49,12 @@ The script auto-discovers all values from the live cluster (API URL, AWS credent
 | 5 | Installs OpenShift GitOps operator |
 | 5b | Creates HTPasswd IDP (`user1`, `user2`, `admin`) |
 | 5c | Generates LiteMaaS secrets with `openssl rand`, creates `OAuthClient` |
+| 5d | Creates BuildConfigs for `notebook-api` and `notebook-ui` — images built and stored in the OpenShift internal registry, no external registry needed |
 | 6 | Deploys ArgoCD bootstrap Application |
 | 7 | Patches `helm.valuesObject` with real values — no git commit needed |
 
-> Nothing sensitive is ever committed to git. All secrets are generated at deploy-time and stored only on the cluster.
+> Nothing sensitive is ever committed to git. All secrets are generated at
+> deploy-time and stored only on the cluster.
 
 ### After deployment
 
@@ -63,6 +71,7 @@ oc create secret generic slack-mcp-token -n lls-demo \
   --from-literal=slack-bot-token=<SLACK_BOT_TOKEN>
 ```
 
+
 ---
 
 ## Platform Overview
@@ -74,22 +83,23 @@ bootstrap/                   ← Root Helm chart (app-of-apps)
   values.yaml                ← Template — cluster values injected at runtime
   templates/
     applications/            ← ArgoCD Application CRs (one per component)
-    extra-resources/         ← Shared cluster-scoped resources (groups, gateway, ArgoCD config)
+    extra-resources/         ← Shared cluster-scoped resources
 
 charts/                      ← Local Helm charts per component
   machinesets/               ← AWS MachineSets (workers + GPU)
   cert-manager/              ← cert-manager Operator
   keycloak/                  ← RHBK Operator
   keycloak-instance/         ← Keycloak DB, CR, realm, route, OAuth
-  litemaas/                  ← LiteMaaS portal (backend, frontend, LiteLLM, PostgreSQL, Redis)
+  litemaas/                  ← LiteMaaS portal
   models-as-a-service/       ← MaaS API + Kuadrant Gateway
+  milvus/                    ← Milvus vector store (standalone + etcd + MinIO)
+  embed-model/               ← Embedding model InferenceService (CPU)
+  notebook-api/              ← RAG Notebook backend (FastAPI)
+  notebook-ui/               ← RAG Notebook frontend (PatternFly 6)
   ...
 
 setup/                       ← One-time bootstrap (run once, not GitOps)
   configure.sh               ← Auto-configure + deploy (zero arguments)
-  gitops-subscription.yaml   ← Install OpenShift GitOps operator
-  cluster-admin-binding.yaml ← Grant cluster-admin to ArgoCD
-  bootstrap.yaml             ← Deploy the root bootstrap Application
 ```
 
 ### Infrastructure
@@ -102,14 +112,10 @@ setup/                       ← One-time bootstrap (run once, not GitOps)
 | MachineSet | Instance | vCPU | RAM | GPUs | Replicas |
 |---|---|---|---|---|---|
 | Workers | `m6a.4xlarge` | 16 | 64 GB | — | 5 |
-| GPU (active) | `g6e.12xlarge` | 48 | 192 GB | **4× NVIDIA L40S** (46 GB each, 184 GB total) | 1 |
+| GPU (active) | `g6e.12xlarge` | 48 | 192 GB | **4× NVIDIA L40S** | 1 |
 | GPU (standby) | `g6e.2xlarge` | 8 | 32 GB | 1× NVIDIA L40S | 0 |
 
-GPU workloads must tolerate `nvidia.com/gpu=l40-gpu:NoSchedule` and request `nvidia.com/gpu` resources.
-
 ### ArgoCD Sync Waves
-
-**UI:** `https://openshift-gitops-server-openshift-gitops.apps.<cluster-domain>`
 
 | Wave | Application | Description |
 |------|-------------|-------------|
@@ -122,34 +128,88 @@ GPU workloads must tolerate `nvidia.com/gpu=l40-gpu:NoSchedule` and request `nvi
 | 4 | `openshift-ai-operator` | RHOAI Operator |
 | 4 | `rhcl-operator` | Kuadrant (RHCL) |
 | 4 | `grafana` | Grafana + dashboards |
-| 4 | `devspaces` | OpenShift DevSpaces |
-| 4 | `cluster-monitoring` | User workload monitoring |
 | 5 | `openshift-ai` | DataScienceCluster operand |
 | 6 | `models` | LLMInferenceServices |
 | 6 | `models-as-a-service` | MaaS API + Kuadrant Gateway |
-| 7 | `llama-stack-instance` | Per-user Llama Stack |
-| 7 | `workspace` | Per-user DevSpaces workspace |
-| 8 | `kubernetes-mcp-server` | Kubernetes MCP server |
-| 8 | `slack-mcp` | Slack MCP server |
+| 7 | `milvus` | Vector store for RAG (etcd + MinIO + Milvus) |
+| 7 | `llama-stack-instance` | Per-user LlamaStack distributions |
+| 8 | `embed-model` | Embedding model (nomic-embed, CPU) |
 | 8 | `litemaas` | LiteMaaS portal |
+| 9 | `notebook-api` | RAG Notebook backend |
+| 9 | `notebook-ui` | RAG Notebook frontend |
+
+
+---
+
+## RAG Notebooks
+
+A NotebookLM-equivalent feature built natively on LlamaStack and OpenShift AI.
+Upload documents, ask questions, get cited answers — all running on your cluster.
+
+### Architecture
+
+```
+Browser → notebook-ui (PatternFly 6)
+               ↓  REST + SSE
+          notebook-api (FastAPI)
+               ↓              ↓
+        LlamaStack RAG     Milvus (vector store)
+        (memory banks)     (per-notebook collections)
+               ↓
+        LLM models via MaaS gateway
+```
+
+### How images are built
+
+`configure.sh` creates two `BuildConfig` resources in the `maas-rag` namespace.
+OpenShift clones the source from GitHub, builds the images on cluster using its
+native build service, and stores them in the **internal image registry** — no
+container runtime, no external registry, and no credentials are needed on the
+operator's machine.
+
+```bash
+# Trigger a rebuild after a code change (optional — selfHeal handles it)
+oc start-build notebook-api -n maas-rag
+oc start-build notebook-ui  -n maas-rag
+
+# Watch build progress
+oc get builds -n maas-rag -w
+```
+
+### Access
+
+| Service | URL |
+|---|---|
+| Notebook UI | `https://notebook.apps.<cluster-domain>` |
+| Notebook API | `https://notebook-api.apps.<cluster-domain>` |
+
+### Components in `maas-rag` namespace
+
+| Component | Role |
+|---|---|
+| `milvus` | Standalone vector store |
+| `milvus-etcd` | Milvus metadata store |
+| `milvus-minio` | Milvus object store |
+| `notebook-api` | FastAPI backend — notebook CRUD, document ingest, LlamaStack RAG |
+| `notebook-ui` | PatternFly 6 frontend — notebook management, file upload, chat |
+| `nomic-embed` | CPU-based embedding InferenceService (nomic-embed-text-v1.5) |
 
 ---
 
 ## Models
 
-All models are served via KServe `LLMInferenceService` in the `llm` namespace, behind the MaaS Gateway at:
+All models are served via KServe `LLMInferenceService` in the `llm` namespace,
+behind the MaaS Gateway at:
 `http://maas.apps.<cluster-domain>/llm/<model-name>/v1`
 
-| Model | Status | GPU |
-|---|---|---|
-| `llama-3-1-8b-instruct-fp8` | ✅ Running | 1× L40S |
-| `mistral-small-24b-fp8` | ✅ Running | 1× L40S |
-| `qwen3-4b-instruct` | ✅ Running | 1× L40S |
-| `phi-4-instruct-w8a8` | ⏸ Stopped | — |
+| Model | GPU |
+|---|---|
+| `llama-3-1-8b-instruct-fp8` | 1× L40S |
+| `mistral-small-24b-fp8` | 1× L40S |
+| `qwen3-4b-instruct` | 1× L40S |
+| `phi-4-instruct-w8a8` | 1× L40S |
 
 ### API Token
-
-The MaaS Gateway (Kuadrant) requires a Kubernetes service account token. **One token works for all models** — every `LLMInferenceService` automatically creates a `RoleBinding` granting the same three tier groups access, so the enterprise tier SA token reaches any model on the cluster.
 
 ```bash
 oc create token default \
@@ -158,84 +218,20 @@ oc create token default \
   --duration=8760h
 ```
 
-### Adding a Model to LiteMaaS
-
-| Field | Value |
-|---|---|
-| Provider | `openai` |
-| Model Name | e.g. `qwen3-4b-instruct` |
-| API Base | `http://maas.apps.<cluster-domain>/llm/<model-name>/v1` |
-| API Key | Token from the command above |
-
----
-
-## LiteMaaS Portal
-
-[LiteMaaS](https://github.com/anatsheh84/lite-maas) is a self-service portal for model subscriptions, API key management, and usage tracking. Deployed at sync wave 8.
-
-```
-Browser → LiteMaaS Frontend (React + PatternFly)
-               ↓
-          LiteMaaS Backend (Fastify + PostgreSQL)
-               ↓
-          LiteLLM Gateway (proxy + budget enforcement)
-               ↓
-          MaaS Gateway (Kuadrant) → KServe model
-```
-
-### Components
-
-| Component | Image | Role |
-|---|---|---|
-| Backend | `litemaas-backend:0.4.0` | API, auth, PostgreSQL |
-| Frontend | `litemaas-frontend:0.4.0` | React + PatternFly 6 UI |
-| LiteLLM | `litellm-non-root:main-v1.81.0-stable-custom` | Model proxy |
-| PostgreSQL | `postgres:16-alpine` | Persistent storage |
-| Redis | `redis:7-alpine` | LiteLLM cache |
-
-### Secrets
-
-All secrets are generated at deploy-time by `configure.sh` using `openssl rand` — nothing is hardcoded or committed to git. They are stored in a single Kubernetes Secret (`litemaas-secrets`) in the deployment namespace.
-
-To regenerate (e.g. fresh install):
-
-```bash
-oc delete secret litemaas-secrets -n litemaas
-oc login https://api.<cluster>:6443 -u kubeadmin -p <PASSWORD> --insecure-skip-tls-verify
-./setup/configure.sh
-```
-
-### RBAC
-
-LiteMaaS maps OpenShift groups to portal roles. The `admin` user is automatically added to `litemaas-admins` via `bootstrap/values.yaml`.
-
-| OpenShift Group | LiteMaaS Role | Access |
-|---|---|---|
-| `litemaas-admins` | `admin` | Full — models, users, subscriptions, API keys |
-| `litemaas-readonly` | `adminReadonly` | Read-only admin view |
-| `litemaas-users` | `user` | Default for all authenticated users |
-
-### Login
-
-Use `admin`, `user1`, or `user2` from the `htpasswd-maas` IDP — **never `kube:admin`**.
-
-> `kube:admin` is a synthetic virtual user with no `metadata.uid`. LiteMaaS requires a real UID to create a user record; logging in as `kube:admin` results in `Authentication failed`.
-
-If your browser has an active `kube:admin` session, open an **incognito window** and select `htpasswd-maas` at the OpenShift login screen.
-
 ---
 
 ## User Guide
 
 ### Credentials
 
-| User | Password | OpenShift Role | LiteMaaS Role |
-|---|---|---|---|
-| `admin` | `NDcxOTE3` (= `471917`) | cluster-admin | admin |
-| `user1` | `MTkxNDU3` (= `191457`) | user | user |
-| `user2` | `MTkxNDU3` (= `191457`) | user | user |
+| User | Password | Role |
+|---|---|---|
+| `admin` | `471917` | cluster-admin, LiteMaaS admin |
+| `user1` | `191457` | user |
+| `user2` | `191457` | user |
 
 Select the **`htpasswd-maas`** IDP on the OpenShift login screen.
+Never use `kube:admin` with LiteMaaS — it has no UID and authentication will fail.
 
 ### Accessing Services
 
@@ -244,16 +240,34 @@ Select the **`htpasswd-maas`** IDP on the OpenShift login screen.
 | OpenShift Console | `https://console-openshift-console.apps.<cluster-domain>` |
 | ArgoCD | `https://openshift-gitops-server-openshift-gitops.apps.<cluster-domain>` |
 | LiteMaaS | `https://litemaas-litemaas.apps.<cluster-domain>` |
-| LiteLLM UI | `https://litellm-litemaas.apps.<cluster-domain>` |
 | Grafana | `https://grafana.apps.<cluster-domain>` |
-| Keycloak SSO | `https://sso.apps.<cluster-domain>` |
+| RAG Notebooks | `https://notebook.apps.<cluster-domain>` |
 
-### First-time RHOAI Setup
+---
 
-After logging in to OpenShift AI, switch to your personal namespace before creating a playground — creating it in any other namespace will fail with a permissions error:
+## LiteMaaS Portal
 
-- `user1` → project `wksp-user1`
-- `user2` → project `wksp-user2`
+Self-service portal for model subscriptions and API key management.
+
+### Secrets
+
+All secrets generated at deploy-time by `configure.sh` using `openssl rand`.
+Nothing is hardcoded or committed to git.
+
+To regenerate on a fresh install:
+
+```bash
+oc delete secret litemaas-secrets -n litemaas
+./setup/configure.sh
+```
+
+### RBAC
+
+| OpenShift Group | LiteMaaS Role |
+|---|---|
+| `litemaas-admins` | admin |
+| `litemaas-readonly` | adminReadonly |
+| `litemaas-users` | user |
 
 ---
 
@@ -261,15 +275,7 @@ After logging in to OpenShift AI, switch to your personal namespace before creat
 
 ### Feature Flags (`bootstrap/values.yaml`)
 
-| Flag | Default | Effect when disabled |
+| Flag | Default | Effect |
 |---|---|---|
-| `keycloak.enabled` | `false` | Skips Keycloak operator and instance. Users authenticate via htpasswd only. |
+| `keycloak.enabled` | `false` | Skips Keycloak — users authenticate via htpasswd only |
 
-### Keycloak (when enabled)
-
-| Item | Value |
-|---|---|
-| URL | `https://sso.apps.<cluster-domain>` |
-| Realm | `sso` |
-| OIDC client | `idp-4-ocp` |
-| OCP OAuth provider | `rhbk` |
