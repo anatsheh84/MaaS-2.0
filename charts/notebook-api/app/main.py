@@ -1,6 +1,8 @@
 import logging
 import uuid
 
+import httpx
+
 from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -28,6 +30,29 @@ class ChatRequest(BaseModel):
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
+
+
+@app.get("/models")
+async def list_models():
+    """Proxy LlamaStack /v1/models and return LLM models for the UI dropdown."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{llamastack_client.settings.llamastack_url}/v1/models")
+            resp.raise_for_status()
+            models = resp.json().get("data", [])
+        llm_models = [
+            {
+                "value": m["identifier"].split("/")[-1],
+                "label": m["identifier"].split("/")[-1].replace("-", " ").title(),
+                "identifier": m["identifier"],
+            }
+            for m in models
+            if m.get("model_type") == "llm"
+        ]
+        return {"models": llm_models}
+    except Exception as e:
+        logger.warning("Could not fetch models from LlamaStack: %s", e)
+        return {"models": []}
 
 
 @app.post("/notebooks", status_code=201)
