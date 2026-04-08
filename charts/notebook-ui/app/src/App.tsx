@@ -133,35 +133,34 @@ export const App: React.FC = () => {
     let emptyCount = 0;
     ingestPollRef.current = setInterval(async () => {
       try {
-        const resp = await fetch(`${API_BASE}/notebooks/${nbId}/ingest-status`);
-        if (!resp.ok) { if (resp.status === 404) handleApiError(resp, true); return; }
-        const data = await resp.json();
-        const jobs = data.jobs || {};
-        setIngestJobs(jobs);
+        // Fetch server-side document list
+        const docResp = await fetch(`${API_BASE}/notebooks/${nbId}/documents`);
+        if (!docResp.ok) { if (docResp.status === 404) handleApiError(docResp, true); return; }
+        const serverDocs: DocEntry[] = (await docResp.json()).documents || [];
+        const serverIds = new Set(serverDocs.map((d) => d.doc_id));
 
-        const jobList = Object.values(jobs) as IngestJob[];
-        if (jobList.length === 0) {
+        // Merge: keep local "uploading"/"embedding" entries not yet on server
+        setDocuments((prev) => {
+          const localPending = prev.filter(
+            (d) => !serverIds.has(d.doc_id) &&
+                   (d.ingest_status === 'uploading' || d.ingest_status === 'embedding')
+          );
+          return [...serverDocs, ...localPending];
+        });
+
+        // Stop when all server docs are done and no local pending remain
+        const allServerDone = serverDocs.length > 0 && serverDocs.every(
+          (d) => d.ingest_status === 'completed' || d.ingest_status === 'failed'
+        );
+        if (allServerDone) {
           emptyCount++;
-          // Stop polling after ~30s of empty results (attachment still processing)
-          if (emptyCount > 10) {
+          // Wait a few more cycles in case more files are being attached
+          if (emptyCount > 3) {
             if (ingestPollRef.current) clearInterval(ingestPollRef.current);
             ingestPollRef.current = null;
-            // Refresh documents list to show final state
-            const docResp = await fetch(`${API_BASE}/notebooks/${nbId}/documents`);
-            if (docResp.ok) { setDocuments((await docResp.json()).documents || []); }
           }
-          return;
-        }
-        emptyCount = 0;
-
-        // Also refresh document list so filenames appear
-        const docResp = await fetch(`${API_BASE}/notebooks/${nbId}/documents`);
-        if (docResp.ok) { setDocuments((await docResp.json()).documents || []); }
-
-        const allDone = jobList.every((j) => j.status === 'completed' || j.status === 'failed');
-        if (allDone) {
-          if (ingestPollRef.current) clearInterval(ingestPollRef.current);
-          ingestPollRef.current = null;
+        } else {
+          emptyCount = 0;
         }
       } catch { /* ignore */ }
     }, 3000);
@@ -219,14 +218,29 @@ export const App: React.FC = () => {
     setUploading(true); setApiError(null);
     try {
       for (const file of fileArray) {
+        // Immediately show the file in the documents list with "uploading" status
+        const tempId = `uploading-${Date.now()}-${file.name}`;
+        setDocuments((prev) => [...prev, { doc_id: tempId, filename: file.name, ingest_status: 'uploading' }]);
+
         const formData = new FormData();
         formData.append('file', file);
         const resp = await fetch(`${API_BASE}/notebooks/${notebookId}/documents`, {
           method: 'POST', body: formData,
         });
-        if (!resp.ok) handleApiError(resp, resp.status === 404);
+        if (!resp.ok) {
+          // Mark as failed
+          setDocuments((prev) => prev.map((d) =>
+            d.doc_id === tempId ? { ...d, ingest_status: 'failed' } : d
+          ));
+          handleApiError(resp, resp.status === 404);
+          continue;
+        }
+        const data = await resp.json();
+        // Replace temp entry with real file ID and "embedding" status
+        setDocuments((prev) => prev.map((d) =>
+          d.doc_id === tempId ? { doc_id: data.file_id, filename: file.name, ingest_status: 'embedding' } : d
+        ));
       }
-      await refreshDocuments(notebookId);
       startIngestPoll(notebookId);
     } finally { setUploading(false); }
   };
@@ -468,36 +482,44 @@ export const App: React.FC = () => {
                         )}
                       </div>
                       {documents.length > 0 && (
-                        <div style={{ marginTop: 8, fontSize: 13, color: '#6a6e73' }}>
-                          {documents.map((doc) => (
-                            <div key={doc.doc_id}>📄 {doc.filename}</div>
-                          ))}
+                        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {documents.map((doc) => {
+                            const status = doc.ingest_status;
+                            const isActive = status === 'uploading' || status === 'embedding' || status === 'in_progress';
+                            const isDone = status === 'completed';
+                            const isFailed = status === 'failed';
+                            return (
+                              <div key={doc.doc_id} style={{
+                                padding: '8px 10px', borderRadius: 6,
+                                border: `1px solid ${isFailed ? '#c9190b' : isDone ? '#3e8635' : '#d2d2d2'}`,
+                                background: isDone ? '#f3faf2' : isFailed ? '#fdf0ef' : '#fafafa',
+                                fontSize: 13,
+                              }}>
+                                <Flex alignItems={{ default: 'alignItemsCenter' }}>
+                                  <FlexItem grow={{ default: 'grow' }}>
+                                    <span style={{ fontWeight: 500 }}>📄 {doc.filename}</span>
+                                  </FlexItem>
+                                  <FlexItem>
+                                    {isActive && <Spinner size="sm" style={{ marginRight: 6 }} />}
+                                    <Label
+                                      color={isDone ? 'green' : isFailed ? 'red' : 'blue'}
+                                      isCompact
+                                    >
+                                      {status === 'uploading' ? 'Uploading...'
+                                        : status === 'embedding' ? 'Embedding...'
+                                        : status === 'in_progress' ? 'Processing...'
+                                        : status === 'completed' ? 'Ready'
+                                        : status === 'failed' ? 'Failed'
+                                        : status}
+                                    </Label>
+                                  </FlexItem>
+                                </Flex>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </FormGroup>
-
-                    {/* Ingest status */}
-                    {Object.keys(ingestJobs).length > 0 && (
-                      <>
-                        <Divider style={{ margin: '16px 0' }} />
-                        <FormGroup label="Ingest status" fieldId="nb-ingest">
-                          {Object.entries(ingestJobs).map(([docId, job]) => (
-                            <div key={docId} style={{ marginBottom: 12 }}>
-                              <div style={{ marginBottom: 4, fontSize: 13 }}>
-                                {job.filename || docId} &mdash;{' '}
-                                <Label color={job.status === 'completed' ? 'green' : job.status === 'failed' ? 'red' : 'blue'}>
-                                  {job.status}
-                                </Label>
-                              </div>
-                              <Progress value={job.progress || 0} title="" size="sm" variant={ingestVariant(job.status)} />
-                              {job.error && (
-                                <div style={{ color: '#c9190b', fontSize: 12, marginTop: 4 }}>{job.error}</div>
-                              )}
-                            </div>
-                          ))}
-                        </FormGroup>
-                      </>
-                    )}
                   </>
                 )}
               </CardBody>
