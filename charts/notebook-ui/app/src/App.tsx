@@ -35,12 +35,10 @@ import {
 
 const API_BASE = window.location.hostname === 'localhost' ? '' : '/api';
 
-const MODELS = [
-  { value: 'qwen3-4b-instruct', label: 'Qwen3 4B Instruct' },
-  { value: 'llama-3-1-8b-instruct-fp8', label: 'Llama 3.1 8B FP8' },
-  { value: 'mistral-small-24b-fp8', label: 'Mistral Small 24B FP8' },
-  { value: 'phi-4-instruct-w8a8', label: 'Phi-4 Instruct W8A8' },
-];
+interface ModelOption {
+  value: string;
+  label: string;
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -78,7 +76,8 @@ export const App: React.FC = () => {
   // ── Chat state ──
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [query, setQuery] = useState('');
-  const [selectedModel, setSelectedModel] = useState(MODELS[0].value);
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
   const [modelSelectOpen, setModelSelectOpen] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -89,6 +88,27 @@ export const App: React.FC = () => {
   }, [messages]);
 
   // ── Ingest polling ──
+
+  // Fetch available models from backend on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/models`)
+      .then((r) => r.json())
+      .then((data) => {
+        const list: ModelOption[] = data.models || [];
+        setModels(list);
+        if (list.length > 0) setSelectedModel(list[0].value);
+      })
+      .catch(() => {
+        // Fallback to known models if fetch fails
+        const fallback = [
+          { value: 'qwen3-4b-instruct', label: 'Qwen3 4B Instruct' },
+          { value: 'llama-3-1-8b-instruct-fp8', label: 'Llama 3.1 8B FP8' },
+        ];
+        setModels(fallback);
+        setSelectedModel(fallback[0].value);
+      });
+  }, []);
+
   const startIngestPoll = useCallback((nbId: string) => {
     if (ingestPollRef.current) clearInterval(ingestPollRef.current);
     ingestPollRef.current = setInterval(async () => {
@@ -459,11 +479,11 @@ export const App: React.FC = () => {
                               isExpanded={modelSelectOpen}
                               style={{ minWidth: 200 }}
                             >
-                              {MODELS.find((m) => m.value === selectedModel)?.label}
+                              {models.find((m) => m.value === selectedModel)?.label ?? 'Select model'}
                             </MenuToggle>
                           )}
                         >
-                          {MODELS.map((m) => (
+                          {models.map((m) => (
                             <SelectOption key={m.value} value={m.value}>
                               {m.label}
                             </SelectOption>
