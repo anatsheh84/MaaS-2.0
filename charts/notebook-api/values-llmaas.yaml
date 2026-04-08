@@ -1,6 +1,9 @@
 namespace: maas-rag
-llamastackUrl: "http://lsd-genai-playground.admin-wkspc.svc.cluster.local:8321"
+# LlamaStack URL — set to the first available shared instance after deploy
+# Pattern: http://{distribution-name}-service.{namespace}.svc.cluster.local:8321
+# Discovery: oc get LlamaStackDistribution -A
+llamastackUrl: "http://lsd-genai-playground-service.wksp-user1.svc.cluster.local:8321"
 milvusUri: "http://milvus.maas-rag.svc.cluster.local:19530"
-embedEndpoint: "http://nomic-embed-predictor.maas-rag.svc.cluster.local/v1"
-embedModel: "nomic-embed"
+embedEndpoint: ""
+embedModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
 doclingUrl: ""

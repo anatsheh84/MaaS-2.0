@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 # In-memory ingest status tracker — sufficient for demo
 ingest_status: dict[str, dict[str, Any]] = {}
 
-# Load embedding model once at startup — all-MiniLM-L6-v2 is 384-dim, fast, CPU-friendly.
-# Override EMBED_MODEL_NAME to use a different sentence-transformers model.
-_EMBED_MODEL_NAME = os.getenv("EMBED_MODEL_NAME", "all-MiniLM-L6-v2")
+# Load embedding model once at startup — same model as LlamaStack sentence-transformers provider.
+# Must match the embedding model registered in LlamaStack (nomic-embed-text-v1.5, 768-dim).
+_EMBED_MODEL_NAME = os.getenv("EMBED_MODEL_NAME", "nomic-ai/nomic-embed-text-v1.5")
 logger.info("Loading embedding model: %s", _EMBED_MODEL_NAME)
 _embed_model = SentenceTransformer(_EMBED_MODEL_NAME)
 COLLECTION_DIM = _embed_model.get_sentence_embedding_dimension()

@@ -11,7 +11,7 @@ replicas: 1
 llamastackUrl: "http://llamastack:8321"
 milvusUri: "http://milvus.maas-rag.svc:19530"
 embedEndpoint: "http://nomic-embed-predictor.maas-rag.svc/v1"
-embedModel: "nomic-embed-text-v1.5"
+embedModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
 doclingUrl: ""
 
 # RAG tuning
