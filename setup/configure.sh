@@ -25,6 +25,7 @@
 # PREREQUISITES:
 #   - oc CLI installed and in PATH, logged in as cluster-admin
 #   - htpasswd (from httpd-tools / apache2-utils) installed and in PATH
+#   - podman logged in to image registry: podman login quay.io
 #   - Run from the root of the MaaS-2.0 repo
 # =============================================================================
 set -euo pipefail
@@ -322,6 +323,52 @@ grantMethod: auto
 OAUTH
   success "OAuthClient litemaas-oauth-client created"
 fi
+
+# ── Step 5d: Create image registry push secret (maas-rag namespace) ───────────
+step "Step 5d/7 — Creating image registry secret for maas-rag builds"
+#
+# The notebook-api and notebook-ui BuildConfigs push images to an external
+# registry (e.g. quay.io). The user must already be logged in via podman.
+# We read their local auth.json and create a secret on the cluster.
+# Nothing is written to git.
+#
+# Supported auth file locations:
+#   ~/.config/containers/auth.json   ← podman default
+#   ~/.docker/config.json            ← docker default
+#
+MAAS_RAG_NS="maas-rag"
+REGISTRY_SECRET="quay-push-secret"
+
+AUTH_FILE=""
+if [[ -f "$HOME/.config/containers/auth.json" ]]; then
+  AUTH_FILE="$HOME/.config/containers/auth.json"
+elif [[ -f "$HOME/.docker/config.json" ]]; then
+  AUTH_FILE="$HOME/.docker/config.json"
+fi
+
+if [[ -z "$AUTH_FILE" ]]; then
+  warn "No container registry auth file found."
+  warn "Skipping quay-push-secret — BuildConfigs will fail to push images."
+  warn "Fix: podman login quay.io  then re-run configure.sh"
+else
+  oc get namespace "$MAAS_RAG_NS" &>/dev/null || oc create namespace "$MAAS_RAG_NS"
+
+  if oc get secret "$REGISTRY_SECRET" -n "$MAAS_RAG_NS" &>/dev/null; then
+    warn "$REGISTRY_SECRET already exists in $MAAS_RAG_NS — refreshing"
+    oc delete secret "$REGISTRY_SECRET" -n "$MAAS_RAG_NS" &>/dev/null || true
+  fi
+
+  oc create secret generic "$REGISTRY_SECRET" \
+    --from-file=.dockerconfigjson="$AUTH_FILE" \
+    --type=kubernetes.io/dockerconfigjson \
+    -n "$MAAS_RAG_NS"
+
+  # Link to builder SA so BuildConfigs can use it automatically
+  oc secrets link builder "$REGISTRY_SECRET" -n "$MAAS_RAG_NS" 2>/dev/null || true
+
+  success "$REGISTRY_SECRET created in $MAAS_RAG_NS (from $AUTH_FILE)"
+fi
+
 # ── Step 6: Deploy bootstrap Application ──────────────────────────────────────
 step "Step 6/7 — Deploying ArgoCD bootstrap Application"
 
@@ -411,7 +458,8 @@ echo "  ✔  Collected all cluster values via oc"
 echo "  ✔  Written to bootstrap/values.local.yaml  (gitignored — never committed)"
 echo "  ✔  Created cert-manager-aws-creds secret on cluster"
 echo "  ✔  Installed OpenShift GitOps operator"
-echo "  ✔  Created HTPasswd users (user1, user2, admin)"
+echo "  ✔  Created HTPasswd users (user1, user2, admin)
+  ✔  Created quay-push-secret in maas-rag from local podman auth"
 echo "  ✔  Generated LiteMaaS secrets in litemaas namespace"
 echo "  ✔  Created OAuthClient for LiteMaaS"
 echo "  ✔  Deployed bootstrap ArgoCD Application"
