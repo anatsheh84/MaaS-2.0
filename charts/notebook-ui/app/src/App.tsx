@@ -25,47 +25,40 @@ import {
   EmptyState,
   EmptyStateBody,
   Spinner,
+  Alert,
+  AlertActionCloseButton,
 } from '@patternfly/react-core';
 import {
   PaperPlaneIcon,
   TrashIcon,
   PlusCircleIcon,
   BookOpenIcon,
+  ArrowLeftIcon,
 } from '@patternfly/react-icons';
 
 const API_BASE = window.location.hostname === 'localhost' ? '' : '/api';
 
-interface ModelOption {
-  value: string;
-  label: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  sources?: string[];
-}
-
-interface IngestJob {
-  status: string;
-  progress?: number;
-  filename?: string;
-  total_chunks?: number;
-  chunks_stored?: number;
-  error?: string;
-}
-
-interface DocEntry {
-  doc_id: string;
-  filename: string;
-  ingest_status: string;
+interface ModelOption { value: string; label: string }
+interface ChatMessage { role: 'user' | 'assistant'; content: string }
+interface IngestJob { status: string; progress?: number; filename?: string; error?: string }
+interface DocEntry { doc_id: string; filename: string; ingest_status: string }
+interface NotebookEntry {
+  notebook_id: string;
+  name: string;
+  file_counts?: { completed?: number; total?: number };
+  status?: string;
+  created_at?: number;
 }
 
 export const App: React.FC = () => {
   // ── Notebook state ──
   const [notebookName, setNotebookName] = useState('');
   const [notebookId, setNotebookId] = useState<string | null>(null);
+  const [activeNotebookName, setActiveNotebookName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [existingNotebooks, setExistingNotebooks] = useState<NotebookEntry[]>([]);
+  const [loadingNotebooks, setLoadingNotebooks] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // ── Documents state ──
   const [documents, setDocuments] = useState<DocEntry[]>([]);
@@ -82,14 +75,41 @@ export const App: React.FC = () => {
   const [streaming, setStreaming] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Ingest polling ──
+  // ── API error handler ──
+  const handleApiError = useCallback((resp: Response, resetNb = false) => {
+    if (resp.status === 404 && resetNb) {
+      setApiError('Notebook no longer exists. Please create or select another.');
+      setNotebookId(null); setActiveNotebookName('');
+      setDocuments([]); setMessages([]);
+    } else if (resp.status === 429) {
+      setApiError('Too many requests — please wait a moment.');
+    } else if (resp.status >= 500) {
+      setApiError(`Server error (${resp.status}) — the API may be restarting.`);
+    } else {
+      setApiError(`Request failed (HTTP ${resp.status}).`);
+    }
+  }, []);
 
-  // Fetch available models from backend on mount
+  // ── Load notebooks list ──
+  const loadNotebooks = useCallback(async () => {
+    setLoadingNotebooks(true);
+    try {
+      const resp = await fetch(`${API_BASE}/notebooks`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setExistingNotebooks(data.notebooks || []);
+      }
+    } catch { /* ignore */ }
+    finally { setLoadingNotebooks(false); }
+  }, []);
+
+  useEffect(() => { loadNotebooks(); }, [loadNotebooks]);
+
+  // ── Load models ──
   useEffect(() => {
     fetch(`${API_BASE}/models`)
       .then((r) => r.json())
@@ -99,25 +119,21 @@ export const App: React.FC = () => {
         if (list.length > 0) setSelectedModel(list[0].value);
       })
       .catch(() => {
-        // Fallback to known models if fetch fails
-        const fallback = [
-          { value: 'qwen3-4b-instruct', label: 'Qwen3 4B Instruct' },
-          { value: 'llama-3-1-8b-instruct-fp8', label: 'Llama 3.1 8B FP8' },
-        ];
+        const fallback = [{ value: 'qwen3-4b-instruct', label: 'Qwen3 4B Instruct' }];
         setModels(fallback);
         setSelectedModel(fallback[0].value);
       });
   }, []);
 
+  // ── Ingest polling ──
   const startIngestPoll = useCallback((nbId: string) => {
     if (ingestPollRef.current) clearInterval(ingestPollRef.current);
     ingestPollRef.current = setInterval(async () => {
       try {
         const resp = await fetch(`${API_BASE}/notebooks/${nbId}/ingest-status`);
-        if (!resp.ok) return;
+        if (!resp.ok) { if (resp.status === 404) handleApiError(resp, true); return; }
         const data = await resp.json();
         setIngestJobs(data.jobs || {});
-
         const allDone = Object.values(data.jobs as Record<string, IngestJob>).every(
           (j) => j.status === 'completed' || j.status === 'failed',
         );
@@ -125,64 +141,72 @@ export const App: React.FC = () => {
           if (ingestPollRef.current) clearInterval(ingestPollRef.current);
           ingestPollRef.current = null;
         }
-      } catch {
-        /* ignore transient errors */
-      }
+      } catch { /* ignore */ }
     }, 3000);
+  }, [handleApiError]);
+
+  useEffect(() => () => {
+    if (ingestPollRef.current) clearInterval(ingestPollRef.current);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (ingestPollRef.current) clearInterval(ingestPollRef.current);
-    };
-  }, []);
+  // ── Notebook actions ──
+  const refreshDocuments = async (nbId: string) => {
+    const resp = await fetch(`${API_BASE}/notebooks/${nbId}/documents`);
+    if (resp.ok) { setDocuments((await resp.json()).documents || []); }
+    else if (resp.status === 404) handleApiError(resp, true);
+  };
 
-  // ── Notebook CRUD ──
+  const selectNotebook = async (nb: NotebookEntry) => {
+    setApiError(null);
+    setNotebookId(nb.notebook_id);
+    setActiveNotebookName(nb.name);
+    setMessages([]); setIngestJobs({});
+    await refreshDocuments(nb.notebook_id);
+  };
+
   const createNotebook = async () => {
     if (!notebookName.trim()) return;
-    setCreating(true);
+    setCreating(true); setApiError(null);
     try {
       const resp = await fetch(`${API_BASE}/notebooks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: notebookName.trim() }),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) { handleApiError(resp); return; }
       const data = await resp.json();
       setNotebookId(data.notebook_id);
-    } finally {
-      setCreating(false);
-    }
+      setActiveNotebookName(notebookName.trim());
+      setNotebookName('');
+      setMessages([]); setDocuments([]); setIngestJobs({});
+      await loadNotebooks();
+    } finally { setCreating(false); }
   };
 
-  const refreshDocuments = async (nbId: string) => {
-    const resp = await fetch(`${API_BASE}/notebooks/${nbId}/documents`);
-    if (resp.ok) {
-      const data = await resp.json();
-      setDocuments(data.documents || []);
-    }
+  const goBackToList = () => {
+    setNotebookId(null); setActiveNotebookName('');
+    setMessages([]); setDocuments([]); setIngestJobs({});
+    if (ingestPollRef.current) { clearInterval(ingestPollRef.current); ingestPollRef.current = null; }
+    loadNotebooks();
   };
 
   // ── File upload ──
   const uploadFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     if (!notebookId || fileArray.length === 0) return;
-    setUploading(true);
+    setUploading(true); setApiError(null);
     try {
       for (const file of fileArray) {
         const formData = new FormData();
         formData.append('file', file);
         const resp = await fetch(`${API_BASE}/notebooks/${notebookId}/documents`, {
-          method: 'POST',
-          body: formData,
+          method: 'POST', body: formData,
         });
-        if (!resp.ok) console.error('Upload failed:', resp.status);
+        if (!resp.ok) handleApiError(resp, resp.status === 404);
       }
       await refreshDocuments(notebookId);
       startIngestPoll(notebookId);
-    } finally {
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,18 +219,17 @@ export const App: React.FC = () => {
     if (e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
   };
 
-  // ── SSE chat via fetch + ReadableStream ──
+  // ── SSE chat ──
   const sendMessage = async () => {
     if (!query.trim() || !notebookId || streaming) return;
     const userQuery = query.trim();
-    setQuery('');
-    setStreaming(true);
+    setQuery(''); setStreaming(true); setApiError(null);
 
     let assistantIdx = 0;
     setMessages((prev) => {
       assistantIdx = prev.length + 1;
       return [...prev, { role: 'user', content: userQuery },
-                       { role: 'assistant', content: '', sources: [] }];
+                       { role: 'assistant', content: '' }];
     });
 
     try {
@@ -217,12 +240,10 @@ export const App: React.FC = () => {
       });
 
       if (!response.ok || !response.body) {
+        handleApiError(response, response.status === 404);
         setMessages((prev) => {
           const updated = [...prev];
-          updated[assistantIdx] = {
-            role: 'assistant',
-            content: `Error: HTTP ${response.status}`,
-          };
+          updated[assistantIdx] = { role: 'assistant', content: `Error: HTTP ${response.status}` };
           return updated;
         });
         return;
@@ -231,12 +252,10 @@ export const App: React.FC = () => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      const collectedSources: string[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -245,20 +264,14 @@ export const App: React.FC = () => {
           if (!line.startsWith('data: ')) continue;
           const payload = line.slice(6).trim();
           if (payload === '[DONE]') continue;
-
           try {
             const parsed = JSON.parse(payload);
-
-            // Extract token — OpenAI chat completions streaming format
             let token = '';
             if (parsed?.choices?.[0]?.delta?.content) {
               token = parsed.choices[0].delta.content;
-            } else if (parsed?.event?.delta?.text) {
-              token = parsed.event.delta.text;
             } else if (typeof parsed?.text === 'string') {
               token = parsed.text;
             }
-
             if (token) {
               setMessages((prev) => {
                 const updated = [...prev];
@@ -267,52 +280,18 @@ export const App: React.FC = () => {
                 return updated;
               });
             }
-
-            // Extract source citations from retrieved_context
-            if (
-              parsed?.event?.payload?.type === 'inference_result' &&
-              parsed?.event?.payload?.retrieved_context
-            ) {
-              for (const ctx of parsed.event.payload.retrieved_context) {
-                if (ctx.source_uri && !collectedSources.includes(ctx.source_uri)) {
-                  collectedSources.push(ctx.source_uri);
-                }
-                if (ctx.source && !collectedSources.includes(ctx.source)) {
-                  collectedSources.push(ctx.source);
-                }
-              }
-            }
-          } catch {
-            /* skip malformed JSON lines */
-          }
+          } catch { /* skip malformed */ }
         }
       }
-
-      // Attach sources once streaming is complete
-      if (collectedSources.length > 0) {
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[assistantIdx] = { ...updated[assistantIdx], sources: collectedSources };
-          return updated;
-        });
-      }
-    } finally {
-      setStreaming(false);
-    }
+    } finally { setStreaming(false); }
   };
 
   const handleChatKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  const clearChat = () => {
-    setMessages([]);
-  };
+  const clearChat = () => setMessages([]);
 
-  // ── Helpers ──
   const ingestVariant = (status: string): ProgressVariant | undefined => {
     if (status === 'completed') return ProgressVariant.success;
     if (status === 'failed') return ProgressVariant.danger;
@@ -328,41 +307,109 @@ export const App: React.FC = () => {
         </Title>
       </PageSection>
 
+      {apiError && (
+        <PageSection style={{ paddingTop: 0, paddingBottom: 0 }}>
+          <Alert
+            variant="danger"
+            title={apiError}
+            actionClose={<AlertActionCloseButton onClose={() => setApiError(null)} />}
+            style={{ marginBottom: 8 }}
+          />
+        </PageSection>
+      )}
+
       <PageSection>
         <Split hasGutter>
           {/* ═══════════ Panel 1: Notebook Setup ═══════════ */}
           <SplitItem style={{ flex: 1, minWidth: 360 }}>
             <Card>
-              <CardTitle>Notebook Setup</CardTitle>
+              <CardTitle>Notebooks</CardTitle>
               <CardBody>
                 {!notebookId ? (
-                  <FormGroup label="Notebook name" fieldId="nb-name">
-                    <Flex>
-                      <FlexItem grow={{ default: 'grow' }}>
-                        <TextInput
-                          id="nb-name"
-                          value={notebookName}
-                          onChange={(_e, val) => setNotebookName(val)}
-                          placeholder="My research notebook"
-                          onKeyDown={(e) => e.key === 'Enter' && createNotebook()}
-                        />
-                      </FlexItem>
+                  <>
+                    {/* Create new */}
+                    <FormGroup label="Create new notebook" fieldId="nb-name">
+                      <Flex>
+                        <FlexItem grow={{ default: 'grow' }}>
+                          <TextInput
+                            id="nb-name"
+                            value={notebookName}
+                            onChange={(_e, val) => setNotebookName(val)}
+                            placeholder="My research notebook"
+                            onKeyDown={(e) => e.key === 'Enter' && createNotebook()}
+                          />
+                        </FlexItem>
+                        <FlexItem>
+                          <Button
+                            icon={<PlusCircleIcon />}
+                            onClick={createNotebook}
+                            isLoading={creating}
+                            isDisabled={!notebookName.trim() || creating}
+                          >
+                            Create
+                          </Button>
+                        </FlexItem>
+                      </Flex>
+                    </FormGroup>
+
+                    {/* Existing notebooks list */}
+                    <Divider style={{ margin: '16px 0' }} />
+                    <FormGroup label="Your notebooks" fieldId="nb-list">
+                      {loadingNotebooks ? (
+                        <Flex justifyContent={{ default: 'justifyContentCenter' }}>
+                          <Spinner size="md" />
+                        </Flex>
+                      ) : existingNotebooks.length === 0 ? (
+                        <div style={{ fontSize: 13, color: '#6a6e73', textAlign: 'center', padding: '12px 0' }}>
+                          No notebooks yet. Create one above.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {existingNotebooks.map((nb) => (
+                            <div
+                              key={nb.notebook_id}
+                              onClick={() => selectNotebook(nb)}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: 6,
+                                border: '1px solid #d2d2d2',
+                                cursor: 'pointer',
+                                background: '#fafafa',
+                                transition: 'background 0.15s',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = '#e7f1fa')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = '#fafafa')}
+                            >
+                              <div style={{ fontWeight: 600, fontSize: 14 }}>
+                                <BookOpenIcon style={{ marginRight: 6 }} />
+                                {nb.name}
+                              </div>
+                              <div style={{ fontSize: 12, color: '#6a6e73', marginTop: 2 }}>
+                                {nb.file_counts?.total || 0} document{(nb.file_counts?.total || 0) !== 1 ? 's' : ''}
+                                {nb.status === 'completed' && (
+                                  <Label color="green" style={{ marginLeft: 8 }} isCompact>ready</Label>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </FormGroup>
+                  </>
+                ) : (
+                  <>
+                    {/* Active notebook view */}
+                    <Flex alignItems={{ default: 'alignItemsCenter' }} style={{ marginBottom: 12 }}>
                       <FlexItem>
-                        <Button
-                          icon={<PlusCircleIcon />}
-                          onClick={createNotebook}
-                          isLoading={creating}
-                          isDisabled={!notebookName.trim() || creating}
-                        >
-                          Create notebook
+                        <Button variant="link" icon={<ArrowLeftIcon />} onClick={goBackToList} style={{ paddingLeft: 0 }}>
+                          All notebooks
                         </Button>
                       </FlexItem>
                     </Flex>
-                  </FormGroup>
-                ) : (
-                  <>
                     <FormGroup label="Active notebook" fieldId="nb-active">
-                      <Label color="blue">{notebookId}</Label>
+                      <Label color="blue" style={{ fontSize: 14 }}>
+                        <BookOpenIcon style={{ marginRight: 4 }} /> {activeNotebookName}
+                      </Label>
                     </FormGroup>
 
                     <Divider style={{ margin: '16px 0' }} />
@@ -416,33 +463,13 @@ export const App: React.FC = () => {
                             <div key={docId} style={{ marginBottom: 12 }}>
                               <div style={{ marginBottom: 4, fontSize: 13 }}>
                                 {job.filename || docId} &mdash;{' '}
-                                <Label
-                                  color={
-                                    job.status === 'completed'
-                                      ? 'green'
-                                      : job.status === 'failed'
-                                        ? 'red'
-                                        : 'blue'
-                                  }
-                                >
+                                <Label color={job.status === 'completed' ? 'green' : job.status === 'failed' ? 'red' : 'blue'}>
                                   {job.status}
                                 </Label>
                               </div>
-                              <Progress
-                                value={job.progress || 0}
-                                title=""
-                                size="sm"
-                                variant={ingestVariant(job.status)}
-                              />
+                              <Progress value={job.progress || 0} title="" size="sm" variant={ingestVariant(job.status)} />
                               {job.error && (
-                                <div style={{ color: '#c9190b', fontSize: 12, marginTop: 4 }}>
-                                  {job.error}
-                                </div>
-                              )}
-                              {job.chunks_stored && (
-                                <div style={{ fontSize: 12, marginTop: 4, color: '#6a6e73' }}>
-                                  {job.chunks_stored} chunks indexed
-                                </div>
+                                <div style={{ color: '#c9190b', fontSize: 12, marginTop: 4 }}>{job.error}</div>
                               )}
                             </div>
                           ))}
@@ -467,10 +494,7 @@ export const App: React.FC = () => {
                         <Select
                           isOpen={modelSelectOpen}
                           selected={selectedModel}
-                          onSelect={(_e, val) => {
-                            setSelectedModel(val as string);
-                            setModelSelectOpen(false);
-                          }}
+                          onSelect={(_e, val) => { setSelectedModel(val as string); setModelSelectOpen(false); }}
                           onOpenChange={setModelSelectOpen}
                           toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
                             <MenuToggle
@@ -484,9 +508,7 @@ export const App: React.FC = () => {
                           )}
                         >
                           {models.map((m) => (
-                            <SelectOption key={m.value} value={m.value}>
-                              {m.label}
-                            </SelectOption>
+                            <SelectOption key={m.value} value={m.value}>{m.label}</SelectOption>
                           ))}
                         </Select>
                       </FlexItem>
@@ -508,7 +530,7 @@ export const App: React.FC = () => {
                 {messages.length === 0 && !notebookId ? (
                   <EmptyState>
                     <EmptyStateBody>
-                      Create a notebook and upload documents to start chatting.
+                      Create or select a notebook to start chatting.
                     </EmptyStateBody>
                   </EmptyState>
                 ) : messages.length === 0 ? (
@@ -543,32 +565,6 @@ export const App: React.FC = () => {
                         {msg.content || (streaming && i === messages.length - 1 ? (
                           <Spinner size="sm" />
                         ) : null)}
-                        {msg.sources && msg.sources.length > 0 && (
-                          <div
-                            style={{
-                              marginTop: 8,
-                              paddingTop: 8,
-                              borderTop: '1px solid #d2d2d2',
-                              fontSize: 12,
-                            }}
-                          >
-                            <strong>Sources:</strong>
-                            <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                              {msg.sources.map((src, si) => (
-                                <li key={si}>
-                                  <a
-                                    href={src}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ color: '#06c' }}
-                                  >
-                                    {src}
-                                  </a>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))
@@ -586,7 +582,7 @@ export const App: React.FC = () => {
                       placeholder={
                         notebookId
                           ? 'Ask a question about your documents...'
-                          : 'Create a notebook first'
+                          : 'Select a notebook first'
                       }
                       isDisabled={!notebookId || streaming}
                       rows={1}
