@@ -94,6 +94,20 @@ async def list_files_in_vector_store(vs_id: str) -> list[dict]:
         return []
 
 
+async def get_file(file_id: str) -> dict | None:
+    """Get file metadata by ID. Returns the file object with filename."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(f"{_BASE}/v1/files/{file_id}")
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.warning("Failed to get file %s: %s", file_id, e)
+        return None
+
+
 async def attach_file_to_vector_store(vs_id: str, file_id: str) -> dict:
     """Attach a file to a vector store (triggers chunking + embedding).
     Uses a long timeout — large files need minutes to embed."""

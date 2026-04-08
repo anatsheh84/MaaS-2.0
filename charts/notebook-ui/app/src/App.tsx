@@ -38,7 +38,7 @@ import {
 
 const API_BASE = window.location.hostname === 'localhost' ? '' : '/api';
 
-interface ModelOption { value: string; label: string }
+interface ModelOption { value: string; label: string; rag_enabled?: boolean }
 interface ChatMessage { role: 'user' | 'assistant'; content: string }
 interface IngestJob { status: string; progress?: number; filename?: string; error?: string }
 interface DocEntry { doc_id: string; filename: string; ingest_status: string }
@@ -116,10 +116,12 @@ export const App: React.FC = () => {
       .then((data) => {
         const list: ModelOption[] = data.models || [];
         setModels(list);
-        if (list.length > 0) setSelectedModel(list[0].value);
+        // Auto-select the RAG-enabled model
+        const ragModel = list.find((m) => m.rag_enabled);
+        setSelectedModel(ragModel?.value || (list.length > 0 ? list[0].value : ''));
       })
       .catch(() => {
-        const fallback = [{ value: 'qwen3-4b-instruct', label: 'Qwen3 4B Instruct' }];
+        const fallback: ModelOption[] = [{ value: 'qwen3-4b-instruct', label: 'Qwen3 4B Instruct', rag_enabled: true }];
         setModels(fallback);
         setSelectedModel(fallback[0].value);
       });
@@ -128,16 +130,36 @@ export const App: React.FC = () => {
   // ── Ingest polling ──
   const startIngestPoll = useCallback((nbId: string) => {
     if (ingestPollRef.current) clearInterval(ingestPollRef.current);
+    let emptyCount = 0;
     ingestPollRef.current = setInterval(async () => {
       try {
         const resp = await fetch(`${API_BASE}/notebooks/${nbId}/ingest-status`);
         if (!resp.ok) { if (resp.status === 404) handleApiError(resp, true); return; }
         const data = await resp.json();
-        setIngestJobs(data.jobs || {});
-        const allDone = Object.values(data.jobs as Record<string, IngestJob>).every(
-          (j) => j.status === 'completed' || j.status === 'failed',
-        );
-        if (allDone && Object.keys(data.jobs).length > 0) {
+        const jobs = data.jobs || {};
+        setIngestJobs(jobs);
+
+        const jobList = Object.values(jobs) as IngestJob[];
+        if (jobList.length === 0) {
+          emptyCount++;
+          // Stop polling after ~30s of empty results (attachment still processing)
+          if (emptyCount > 10) {
+            if (ingestPollRef.current) clearInterval(ingestPollRef.current);
+            ingestPollRef.current = null;
+            // Refresh documents list to show final state
+            const docResp = await fetch(`${API_BASE}/notebooks/${nbId}/documents`);
+            if (docResp.ok) { setDocuments((await docResp.json()).documents || []); }
+          }
+          return;
+        }
+        emptyCount = 0;
+
+        // Also refresh document list so filenames appear
+        const docResp = await fetch(`${API_BASE}/notebooks/${nbId}/documents`);
+        if (docResp.ok) { setDocuments((await docResp.json()).documents || []); }
+
+        const allDone = jobList.every((j) => j.status === 'completed' || j.status === 'failed');
+        if (allDone) {
           if (ingestPollRef.current) clearInterval(ingestPollRef.current);
           ingestPollRef.current = null;
         }
@@ -508,7 +530,14 @@ export const App: React.FC = () => {
                           )}
                         >
                           {models.map((m) => (
-                            <SelectOption key={m.value} value={m.value}>{m.label}</SelectOption>
+                            <SelectOption
+                              key={m.value}
+                              value={m.value}
+                              isDisabled={m.rag_enabled === false}
+                              description={m.rag_enabled ? 'RAG enabled' : 'Not available for RAG'}
+                            >
+                              {m.label}
+                            </SelectOption>
                           ))}
                         </Select>
                       </FlexItem>

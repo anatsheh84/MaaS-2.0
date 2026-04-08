@@ -78,6 +78,8 @@ async def list_models():
                 )
                 resp.raise_for_status()
                 items = resp.json().get("items", [])
+            # The RAG model is the one configured in LlamaStack
+            rag_model = settings.llamastack_model_id.split("/")[-1]
             models = [
                 {
                     "value": item["metadata"]["name"],
@@ -86,6 +88,7 @@ async def list_models():
                         .get("openshift.io/display-name")
                         or item["metadata"]["name"].replace("-", " ").title()
                     ),
+                    "rag_enabled": item["metadata"]["name"] == rag_model,
                 }
                 for item in items
                 if item.get("status", {}).get("conditions", [{}])[0].get("status") != "False"
@@ -226,17 +229,20 @@ async def list_documents(notebook_id: str):
     if not vs:
         raise HTTPException(404, "Notebook not found")
 
-    files = await llamastack_client.list_files_in_vector_store(notebook_id)
-    return {
-        "documents": [
-            {
-                "doc_id": f["id"],
-                "filename": f.get("filename", f["id"]),
-                "ingest_status": f.get("status", "unknown"),
-            }
-            for f in files
-        ],
-    }
+    vs_files = await llamastack_client.list_files_in_vector_store(notebook_id)
+
+    # Resolve filenames — vector store file objects don't include filename,
+    # so we fetch each file's metadata from /v1/files/{id}
+    docs = []
+    for f in vs_files:
+        file_meta = await llamastack_client.get_file(f["id"])
+        filename = file_meta.get("filename", f["id"]) if file_meta else f["id"]
+        docs.append({
+            "doc_id": f["id"],
+            "filename": filename,
+            "ingest_status": f.get("status", "unknown"),
+        })
+    return {"documents": docs}
 
 
 @app.get("/notebooks/{notebook_id}/ingest-status")
@@ -246,12 +252,14 @@ async def get_ingest_status(notebook_id: str):
     if not vs:
         raise HTTPException(404, "Notebook not found")
 
-    files = await llamastack_client.list_files_in_vector_store(notebook_id)
+    vs_files = await llamastack_client.list_files_in_vector_store(notebook_id)
     jobs = {}
-    for f in files:
+    for f in vs_files:
+        file_meta = await llamastack_client.get_file(f["id"])
+        filename = file_meta.get("filename", f["id"]) if file_meta else f["id"]
         jobs[f["id"]] = {
             "doc_id": f["id"],
-            "filename": f.get("filename", f["id"]),
+            "filename": filename,
             "status": f.get("status", "unknown"),
             "progress": 100 if f.get("status") == "completed" else 50,
         }
