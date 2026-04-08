@@ -33,6 +33,12 @@ data:
     rocksmq:
       path: /var/lib/milvus/rdb_data
 
+    localStorage:
+      path: /var/lib/milvus/data
+
+    queryNode:
+      localStoragePath: /var/lib/milvus/data
+
     proxy:
       port: 19530
 
