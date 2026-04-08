@@ -1,25 +1,26 @@
 {{- range .Values.models }}
 ---
-apiVersion: serving.kserve.io/v1beta1
-kind: InferenceService
+# Embedding model served via LLMInferenceService (same CRD as LLM models).
+# CPU-only: no HardwareProfile, no nodeSelector, no GPU tolerations.
+# Exposed as an internal ClusterIP service only — not behind the MaaS gateway.
+apiVersion: serving.kserve.io/v1alpha1
+kind: LLMInferenceService
 metadata:
   name: {{ .name }}
   namespace: {{ $.Values.namespace }}
   annotations:
     openshift.io/display-name: {{ .displayName }}
-    serving.kserve.io/deploymentMode: RawDeployment
   labels:
     opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
 spec:
-  predictor:
-    model:
-      modelFormat:
-        name: vLLM
-      storageUri: {{ .uri }}
-    minReplicas: {{ .replicas | default 1 }}
-    maxReplicas: {{ .replicas | default 1 }}
+  model:
+    name: {{ .name }}
+    uri: {{ .uri }}
+  replicas: {{ .replicas | default 1 }}
+  template:
     containers:
-    - name: kserve-container
+    - name: main
       image: {{ .image | default $.Values.image }}
       command:
       - python
@@ -37,16 +38,12 @@ spec:
         httpGet:
           path: /health
           port: 8000
-        initialDelaySeconds: 120
-        periodSeconds: 30
-        failureThreshold: 5
+          scheme: HTTPS
       readinessProbe:
         httpGet:
           path: /health
           port: 8000
-        initialDelaySeconds: 60
-        periodSeconds: 15
-        failureThreshold: 3
+          scheme: HTTPS
       resources:
         {{- toYaml .resources | nindent 8 }}
       volumeMounts:
