@@ -4,7 +4,7 @@
 
 namespace: maas-rag
 
-image: quay.io/anatsheh84/notebook-api:v1
+image: quay.io/anatsheh84/notebook-api:v2
 replicas: 1
 
 # Upstream service URLs — defaults assume all services in maas-rag namespace
