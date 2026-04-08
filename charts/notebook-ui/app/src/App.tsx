@@ -11,11 +11,6 @@ import {
   TextInput,
   Button,
   FormGroup,
-  DropEvent,
-  MultipleFileUpload,
-  MultipleFileUploadMain,
-  MultipleFileUploadStatus,
-  MultipleFileUploadStatusItem,
   Progress,
   ProgressVariant,
   Label,
@@ -149,23 +144,35 @@ export const App: React.FC = () => {
   };
 
   // ── File upload ──
-  const handleFileDrop = async (_event: DropEvent, files: File[]) => {
-    if (!notebookId || files.length === 0) return;
+  const uploadFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (!notebookId || fileArray.length === 0) return;
     setUploading(true);
     try {
-      for (const file of files) {
+      for (const file of fileArray) {
         const formData = new FormData();
         formData.append('file', file);
-        await fetch(`${API_BASE}/notebooks/${notebookId}/documents`, {
+        const resp = await fetch(`${API_BASE}/notebooks/${notebookId}/documents`, {
           method: 'POST',
           body: formData,
         });
+        if (!resp.ok) console.error('Upload failed:', resp.status);
       }
       await refreshDocuments(notebookId);
       startIngestPoll(notebookId);
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) uploadFiles(e.target.files);
+    e.target.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
   };
 
   // ── SSE chat via fetch + ReadableStream ──
@@ -343,36 +350,43 @@ export const App: React.FC = () => {
                     <Divider style={{ margin: '16px 0' }} />
 
                     <FormGroup label="Upload documents" fieldId="nb-upload">
-                      <MultipleFileUpload
-                        onFileDrop={handleFileDrop}
-                        dropzoneProps={{
-                          accept: {
-                            'application/pdf': ['.pdf'],
-                            'text/plain': ['.txt'],
-                            'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                              ['.docx'],
-                          },
+                      <div
+                        onDrop={handleDrop}
+                        onDragOver={(e) => e.preventDefault()}
+                        style={{
+                          border: '2px dashed var(--pf-v5-global--BorderColor--100, #d2d2d2)',
+                          borderRadius: 8,
+                          padding: '20px 16px',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          background: uploading ? '#f5f5f5' : 'transparent',
                         }}
+                        onClick={() => document.getElementById('file-input')?.click()}
                       >
-                        <MultipleFileUploadMain
-                          titleIcon={uploading ? <Spinner size="md" /> : undefined}
-                          titleText={uploading ? 'Uploading...' : 'Drag and drop files here'}
-                          infoText="Accepted: PDF, TXT, DOCX"
+                        <input
+                          id="file-input"
+                          type="file"
+                          accept=".pdf,.txt,.docx"
+                          multiple
+                          style={{ display: 'none' }}
+                          onChange={handleFileInput}
                         />
-                        {documents.length > 0 && (
-                          <MultipleFileUploadStatus
-                            statusToggleText={`${documents.length} file(s) uploaded`}
-                          >
-                            {documents.map((doc) => (
-                              <MultipleFileUploadStatusItem
-                                key={doc.doc_id}
-                                fileName={doc.filename}
-                                fileSize={0}
-                              />
-                            ))}
-                          </MultipleFileUploadStatus>
+                        {uploading ? (
+                          <><Spinner size="md" /> <span style={{ marginLeft: 8, fontSize: 13 }}>Uploading...</span></>
+                        ) : (
+                          <span style={{ fontSize: 13, color: '#6a6e73' }}>
+                            Click to select or drag files here<br/>
+                            <small>PDF, TXT, DOCX accepted</small>
+                          </span>
                         )}
-                      </MultipleFileUpload>
+                      </div>
+                      {documents.length > 0 && (
+                        <div style={{ marginTop: 8, fontSize: 13, color: '#6a6e73' }}>
+                          {documents.map((doc) => (
+                            <div key={doc.doc_id}>📄 {doc.filename}</div>
+                          ))}
+                        </div>
+                      )}
                     </FormGroup>
 
                     {/* Ingest status */}
