@@ -3,7 +3,7 @@ import uuid
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile
 from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
+from fastapi.responses import StreamingResponse
 
 from . import ingest, llamastack_client
 
@@ -119,9 +119,12 @@ async def list_documents(notebook_id: str):
 async def chat(notebook_id: str, body: ChatRequest):
     if notebook_id not in notebooks:
         raise HTTPException(status_code=404, detail="Notebook not found")
-    return EventSourceResponse(
-        llamastack_client.chat_stream(notebook_id, body.query, body.model)
-    )
+    async def stream_gen():
+        async for chunk in llamastack_client.chat_stream(notebook_id, body.query, body.model):
+            yield f"data: {chunk}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream_gen(), media_type="text/event-stream")
 
 
 @app.get("/notebooks/{notebook_id}/ingest-status")

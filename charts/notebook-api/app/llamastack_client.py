@@ -107,7 +107,7 @@ async def chat_stream(notebook_id: str, query: str, model: str) -> AsyncIterator
             if stream.status_code >= 400:
                 error_body = await stream.aread()
                 logger.error("MaaS gateway error %d: %s", stream.status_code, error_body)
-                yield f"data: {{\"error\": \"Gateway error {stream.status_code}\"}}\n\n"
+                yield f"{{\"error\": \"Gateway error {stream.status_code}\"}}"
                 return
 
             async for line in stream.aiter_lines():
@@ -115,6 +115,5 @@ async def chat_stream(notebook_id: str, query: str, model: str) -> AsyncIterator
                     continue
                 payload = line[6:].strip()
                 if payload == "[DONE]":
-                    yield "data: [DONE]\n\n"
-                    break
-                yield f"data: {payload}\n\n"
+                    return
+                yield payload
