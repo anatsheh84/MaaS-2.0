@@ -6,7 +6,7 @@ namespace: maas-rag
 
 # ── Milvus ────────────────────────────────────────────────────────────────────
 milvus:
-  image: milvusdb/milvus:v2.4.13
+  image: milvusdb/milvus:v2.4.9
   storageSize: 20Gi
   storageClass: gp3-csi
   resources:
