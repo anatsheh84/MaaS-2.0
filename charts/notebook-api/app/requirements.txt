@@ -6,3 +6,4 @@ httpx==0.28.1
 python-multipart==0.0.20
 sse-starlette==2.2.1
 pydantic-settings==2.7.1
+sentence-transformers==3.3.1

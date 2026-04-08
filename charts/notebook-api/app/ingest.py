@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import logging
 import os
@@ -6,6 +7,7 @@ from typing import Any
 
 import httpx
 from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections, utility
+from sentence_transformers import SentenceTransformer
 
 from .config import settings
 
@@ -14,9 +16,13 @@ logger = logging.getLogger(__name__)
 # In-memory ingest status tracker — sufficient for demo
 ingest_status: dict[str, dict[str, Any]] = {}
 
-# nomic-embed-text-v1.5 output dimension is 768.
-# bge-m3 outputs 1024. Update this if switching embed models.
-COLLECTION_DIM = int(os.getenv("EMBED_DIM", "768"))
+# Load embedding model once at startup — all-MiniLM-L6-v2 is 384-dim, fast, CPU-friendly.
+# Override EMBED_MODEL_NAME to use a different sentence-transformers model.
+_EMBED_MODEL_NAME = os.getenv("EMBED_MODEL_NAME", "all-MiniLM-L6-v2")
+logger.info("Loading embedding model: %s", _EMBED_MODEL_NAME)
+_embed_model = SentenceTransformer(_EMBED_MODEL_NAME)
+COLLECTION_DIM = _embed_model.get_sentence_embedding_dimension()
+logger.info("Embedding model loaded — dimension: %d", COLLECTION_DIM)
 
 
 def _collection_name(notebook_id: str) -> str:
@@ -100,15 +106,12 @@ def _extract_text_basic(file_bytes: bytes, filename: str) -> str:
 
 
 async def _get_embeddings(texts: list[str]) -> list[list[float]]:
-    """Call OpenAI-compatible /v1/embeddings endpoint."""
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(
-            f"{settings.embed_endpoint}/embeddings",
-            json={"input": texts, "model": settings.embed_model},
-        )
-        resp.raise_for_status()
-        data = resp.json()["data"]
-        return [item["embedding"] for item in sorted(data, key=lambda x: x["index"])]
+    """Embed texts locally using sentence-transformers — no external service needed."""
+    loop = asyncio.get_event_loop()
+    embeddings = await loop.run_in_executor(
+        None, lambda: _embed_model.encode(texts, show_progress_bar=False).tolist()
+    )
+    return embeddings
 
 
 def _ensure_collection(notebook_id: str) -> Collection:
