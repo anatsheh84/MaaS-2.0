@@ -140,21 +140,22 @@ export const App: React.FC = () => {
         const serverIds = new Set(serverDocs.map((d) => d.doc_id));
 
         // Merge: keep local "uploading"/"embedding" entries not yet on server
+        let localPendingCount = 0;
         setDocuments((prev) => {
           const localPending = prev.filter(
             (d) => !serverIds.has(d.doc_id) &&
                    (d.ingest_status === 'uploading' || d.ingest_status === 'embedding')
           );
+          localPendingCount = localPending.length;
           return [...serverDocs, ...localPending];
         });
 
-        // Stop when all server docs are done and no local pending remain
+        // Stop only when ALL server docs are done AND no local pending entries remain
         const allServerDone = serverDocs.length > 0 && serverDocs.every(
           (d) => d.ingest_status === 'completed' || d.ingest_status === 'failed'
         );
-        if (allServerDone) {
+        if (allServerDone && localPendingCount === 0) {
           emptyCount++;
-          // Wait a few more cycles in case more files are being attached
           if (emptyCount > 3) {
             if (ingestPollRef.current) clearInterval(ingestPollRef.current);
             ingestPollRef.current = null;
