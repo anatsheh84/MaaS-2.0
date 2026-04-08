@@ -229,14 +229,12 @@ export const App: React.FC = () => {
           try {
             const parsed = JSON.parse(payload);
 
-            // Extract token text — handle multiple payload shapes
+            // Extract token — OpenAI chat completions streaming format
             let token = '';
-            if (parsed?.event?.delta?.text) {
+            if (parsed?.choices?.[0]?.delta?.content) {
+              token = parsed.choices[0].delta.content;
+            } else if (parsed?.event?.delta?.text) {
               token = parsed.event.delta.text;
-            } else if (parsed?.delta?.content) {
-              token = parsed.delta.content;
-            } else if (parsed?.event?.payload?.text) {
-              token = parsed.event.payload.text;
             } else if (typeof parsed?.text === 'string') {
               token = parsed.text;
             }
