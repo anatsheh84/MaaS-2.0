@@ -64,18 +64,13 @@ interface DocEntry {
 }
 
 export const App: React.FC = () => {
-  // ── Notebook state ──
   const [notebookName, setNotebookName] = useState('');
   const [notebookId, setNotebookId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-
-  // ── Documents state ──
   const [documents, setDocuments] = useState<DocEntry[]>([]);
   const [uploading, setUploading] = useState(false);
   const [ingestJobs, setIngestJobs] = useState<Record<string, IngestJob>>({});
   const ingestPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // ── Chat state ──
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [query, setQuery] = useState('');
   const [selectedModel, setSelectedModel] = useState(MODELS[0].value);
@@ -83,41 +78,35 @@ export const App: React.FC = () => {
   const [streaming, setStreaming] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Ingest polling ──
   const startIngestPoll = useCallback((nbId: string) => {
     if (ingestPollRef.current) clearInterval(ingestPollRef.current);
     ingestPollRef.current = setInterval(async () => {
       try {
         const resp = await fetch(`${API_BASE}/notebooks/${nbId}/ingest-status`);
-        if (!resp.ok) return;
+        if (!resp.ok) {
+          if (resp.status === 404) clearInterval(ingestPollRef.current!);
+          return;
+        }
         const data = await resp.json();
         setIngestJobs(data.jobs || {});
-
         const allDone = Object.values(data.jobs as Record<string, IngestJob>).every(
           (j) => j.status === 'completed' || j.status === 'failed',
         );
         if (allDone && Object.keys(data.jobs).length > 0) {
           if (ingestPollRef.current) clearInterval(ingestPollRef.current);
           ingestPollRef.current = null;
+          await refreshDocuments(nbId);
         }
-      } catch {
-        /* ignore transient errors */
-      }
+      } catch { /* ignore */ }
     }, 3000);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (ingestPollRef.current) clearInterval(ingestPollRef.current);
-    };
-  }, []);
+  useEffect(() => () => { if (ingestPollRef.current) clearInterval(ingestPollRef.current); }, []);
 
-  // ── Notebook CRUD ──
   const createNotebook = async () => {
     if (!notebookName.trim()) return;
     setCreating(true);
@@ -143,7 +132,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // ── File upload ──
   const uploadFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     if (!notebookId || fileArray.length === 0) return;
@@ -152,13 +140,10 @@ export const App: React.FC = () => {
       for (const file of fileArray) {
         const formData = new FormData();
         formData.append('file', file);
-        const resp = await fetch(`${API_BASE}/notebooks/${notebookId}/documents`, {
-          method: 'POST',
-          body: formData,
+        await fetch(`${API_BASE}/notebooks/${notebookId}/documents`, {
+          method: 'POST', body: formData,
         });
-        if (!resp.ok) console.error('Upload failed:', resp.status);
       }
-      await refreshDocuments(notebookId);
       startIngestPoll(notebookId);
     } finally {
       setUploading(false);
@@ -175,7 +160,6 @@ export const App: React.FC = () => {
     if (e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
   };
 
-  // ── SSE chat via fetch + ReadableStream ──
   const sendMessage = async () => {
     if (!query.trim() || !notebookId || streaming) return;
     const userQuery = query.trim();
@@ -185,8 +169,9 @@ export const App: React.FC = () => {
     let assistantIdx = 0;
     setMessages((prev) => {
       assistantIdx = prev.length + 1;
-      return [...prev, { role: 'user', content: userQuery },
-                       { role: 'assistant', content: '', sources: [] }];
+      return [...prev,
+        { role: 'user', content: userQuery },
+        { role: 'assistant', content: '', sources: [] }];
     });
 
     try {
@@ -199,10 +184,7 @@ export const App: React.FC = () => {
       if (!response.ok || !response.body) {
         setMessages((prev) => {
           const updated = [...prev];
-          updated[assistantIdx] = {
-            role: 'assistant',
-            content: `Error: HTTP ${response.status}`,
-          };
+          updated[assistantIdx] = { role: 'assistant', content: `Error: HTTP ${response.status}` };
           return updated;
         });
         return;
@@ -211,12 +193,10 @@ export const App: React.FC = () => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      const collectedSources: string[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -225,22 +205,17 @@ export const App: React.FC = () => {
           if (!line.startsWith('data: ')) continue;
           const payload = line.slice(6).trim();
           if (payload === '[DONE]') continue;
-
           try {
             const parsed = JSON.parse(payload);
-
-            // Extract token text — handle multiple payload shapes
+            // OpenAI chat completions streaming format
             let token = '';
-            if (parsed?.event?.delta?.text) {
+            if (parsed?.choices?.[0]?.delta?.content) {
+              token = parsed.choices[0].delta.content;
+            } else if (parsed?.event?.delta?.text) {
               token = parsed.event.delta.text;
-            } else if (parsed?.delta?.content) {
-              token = parsed.delta.content;
-            } else if (parsed?.event?.payload?.text) {
-              token = parsed.event.payload.text;
             } else if (typeof parsed?.text === 'string') {
               token = parsed.text;
             }
-
             if (token) {
               setMessages((prev) => {
                 const updated = [...prev];
@@ -249,34 +224,8 @@ export const App: React.FC = () => {
                 return updated;
               });
             }
-
-            // Extract source citations from retrieved_context
-            if (
-              parsed?.event?.payload?.type === 'inference_result' &&
-              parsed?.event?.payload?.retrieved_context
-            ) {
-              for (const ctx of parsed.event.payload.retrieved_context) {
-                if (ctx.source_uri && !collectedSources.includes(ctx.source_uri)) {
-                  collectedSources.push(ctx.source_uri);
-                }
-                if (ctx.source && !collectedSources.includes(ctx.source)) {
-                  collectedSources.push(ctx.source);
-                }
-              }
-            }
-          } catch {
-            /* skip malformed JSON lines */
-          }
+          } catch { /* skip malformed */ }
         }
-      }
-
-      // Attach sources once streaming is complete
-      if (collectedSources.length > 0) {
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[assistantIdx] = { ...updated[assistantIdx], sources: collectedSources };
-          return updated;
-        });
       }
     } finally {
       setStreaming(false);
@@ -284,24 +233,15 @@ export const App: React.FC = () => {
   };
 
   const handleChatKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  const clearChat = () => {
-    setMessages([]);
-  };
-
-  // ── Helpers ──
   const ingestVariant = (status: string): ProgressVariant | undefined => {
     if (status === 'completed') return ProgressVariant.success;
     if (status === 'failed') return ProgressVariant.danger;
     return undefined;
   };
 
-  // ── Render ──
   return (
     <Page>
       <PageSection variant="default">
@@ -312,7 +252,7 @@ export const App: React.FC = () => {
 
       <PageSection>
         <Split hasGutter>
-          {/* ═══════════ Panel 1: Notebook Setup ═══════════ */}
+          {/* Panel 1: Notebook Setup */}
           <SplitItem style={{ flex: 1, minWidth: 360 }}>
             <Card>
               <CardTitle>Notebook Setup</CardTitle>
@@ -322,20 +262,15 @@ export const App: React.FC = () => {
                     <Flex>
                       <FlexItem grow={{ default: 'grow' }}>
                         <TextInput
-                          id="nb-name"
-                          value={notebookName}
+                          id="nb-name" value={notebookName}
                           onChange={(_e, val) => setNotebookName(val)}
                           placeholder="My research notebook"
                           onKeyDown={(e) => e.key === 'Enter' && createNotebook()}
                         />
                       </FlexItem>
                       <FlexItem>
-                        <Button
-                          icon={<PlusCircleIcon />}
-                          onClick={createNotebook}
-                          isLoading={creating}
-                          isDisabled={!notebookName.trim() || creating}
-                        >
+                        <Button icon={<PlusCircleIcon />} onClick={createNotebook}
+                          isLoading={creating} isDisabled={!notebookName.trim() || creating}>
                           Create notebook
                         </Button>
                       </FlexItem>
@@ -346,50 +281,33 @@ export const App: React.FC = () => {
                     <FormGroup label="Active notebook" fieldId="nb-active">
                       <Label color="blue">{notebookId}</Label>
                     </FormGroup>
-
                     <Divider style={{ margin: '16px 0' }} />
-
                     <FormGroup label="Upload documents" fieldId="nb-upload">
                       <div
-                        onDrop={handleDrop}
-                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}
                         style={{
                           border: '2px dashed var(--pf-v5-global--BorderColor--100, #d2d2d2)',
-                          borderRadius: 8,
-                          padding: '20px 16px',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          background: uploading ? '#f5f5f5' : 'transparent',
+                          borderRadius: 8, padding: '20px 16px', textAlign: 'center',
+                          cursor: 'pointer', background: uploading ? '#f5f5f5' : 'transparent',
                         }}
                         onClick={() => document.getElementById('file-input')?.click()}
                       >
-                        <input
-                          id="file-input"
-                          type="file"
-                          accept=".pdf,.txt,.docx"
-                          multiple
-                          style={{ display: 'none' }}
-                          onChange={handleFileInput}
-                        />
-                        {uploading ? (
-                          <><Spinner size="md" /> <span style={{ marginLeft: 8, fontSize: 13 }}>Uploading...</span></>
-                        ) : (
-                          <span style={{ fontSize: 13, color: '#6a6e73' }}>
-                            Click to select or drag files here<br/>
-                            <small>PDF, TXT, DOCX accepted</small>
-                          </span>
-                        )}
+                        <input id="file-input" type="file" accept=".pdf,.txt,.docx" multiple
+                          style={{ display: 'none' }} onChange={handleFileInput} />
+                        {uploading
+                          ? <><Spinner size="md" /><span style={{ marginLeft: 8, fontSize: 13 }}>Uploading...</span></>
+                          : <span style={{ fontSize: 13, color: '#6a6e73' }}>
+                              Click to select or drag files here<br />
+                              <small>PDF, TXT, DOCX accepted</small>
+                            </span>}
                       </div>
                       {documents.length > 0 && (
                         <div style={{ marginTop: 8, fontSize: 13, color: '#6a6e73' }}>
-                          {documents.map((doc) => (
-                            <div key={doc.doc_id}>📄 {doc.filename}</div>
-                          ))}
+                          {documents.map((doc) => <div key={doc.doc_id}>📄 {doc.filename}</div>)}
                         </div>
                       )}
                     </FormGroup>
 
-                    {/* Ingest status */}
                     {Object.keys(ingestJobs).length > 0 && (
                       <>
                         <Divider style={{ margin: '16px 0' }} />
@@ -398,34 +316,13 @@ export const App: React.FC = () => {
                             <div key={docId} style={{ marginBottom: 12 }}>
                               <div style={{ marginBottom: 4, fontSize: 13 }}>
                                 {job.filename || docId} &mdash;{' '}
-                                <Label
-                                  color={
-                                    job.status === 'completed'
-                                      ? 'green'
-                                      : job.status === 'failed'
-                                        ? 'red'
-                                        : 'blue'
-                                  }
-                                >
+                                <Label color={job.status === 'completed' ? 'green' : job.status === 'failed' ? 'red' : 'blue'}>
                                   {job.status}
                                 </Label>
                               </div>
-                              <Progress
-                                value={job.progress || 0}
-                                title=""
-                                size="sm"
-                                variant={ingestVariant(job.status)}
-                              />
-                              {job.error && (
-                                <div style={{ color: '#c9190b', fontSize: 12, marginTop: 4 }}>
-                                  {job.error}
-                                </div>
-                              )}
-                              {job.chunks_stored && (
-                                <div style={{ fontSize: 12, marginTop: 4, color: '#6a6e73' }}>
-                                  {job.chunks_stored} chunks indexed
-                                </div>
-                              )}
+                              <Progress value={job.progress || 0} title="" size="sm"
+                                variant={ingestVariant(job.status)} />
+                              {job.error && <div style={{ color: '#c9190b', fontSize: 12, marginTop: 4 }}>{job.error}</div>}
                             </div>
                           ))}
                         </FormGroup>
@@ -437,7 +334,7 @@ export const App: React.FC = () => {
             </Card>
           </SplitItem>
 
-          {/* ═══════════ Panel 2: Chat Interface ═══════════ */}
+          {/* Panel 2: Chat */}
           <SplitItem style={{ flex: 2, minWidth: 480 }}>
             <Card style={{ display: 'flex', flexDirection: 'column', height: '80vh' }}>
               <CardTitle>
@@ -446,40 +343,21 @@ export const App: React.FC = () => {
                   <FlexItem>
                     <Flex spaceItems={{ default: 'spaceItemsSm' }}>
                       <FlexItem>
-                        <Select
-                          isOpen={modelSelectOpen}
-                          selected={selectedModel}
-                          onSelect={(_e, val) => {
-                            setSelectedModel(val as string);
-                            setModelSelectOpen(false);
-                          }}
+                        <Select isOpen={modelSelectOpen} selected={selectedModel}
+                          onSelect={(_e, val) => { setSelectedModel(val as string); setModelSelectOpen(false); }}
                           onOpenChange={setModelSelectOpen}
                           toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-                            <MenuToggle
-                              ref={toggleRef}
-                              onClick={() => setModelSelectOpen(!modelSelectOpen)}
-                              isExpanded={modelSelectOpen}
-                              style={{ minWidth: 200 }}
-                            >
+                            <MenuToggle ref={toggleRef} onClick={() => setModelSelectOpen(!modelSelectOpen)}
+                              isExpanded={modelSelectOpen} style={{ minWidth: 200 }}>
                               {MODELS.find((m) => m.value === selectedModel)?.label}
                             </MenuToggle>
-                          )}
-                        >
-                          {MODELS.map((m) => (
-                            <SelectOption key={m.value} value={m.value}>
-                              {m.label}
-                            </SelectOption>
-                          ))}
+                          )}>
+                          {MODELS.map((m) => <SelectOption key={m.value} value={m.value}>{m.label}</SelectOption>)}
                         </Select>
                       </FlexItem>
                       <FlexItem>
-                        <Button
-                          variant="plain"
-                          icon={<TrashIcon />}
-                          onClick={clearChat}
-                          aria-label="Clear conversation"
-                          isDisabled={messages.length === 0}
-                        />
+                        <Button variant="plain" icon={<TrashIcon />} onClick={() => setMessages([])}
+                          aria-label="Clear" isDisabled={messages.length === 0} />
                       </FlexItem>
                     </Flex>
                   </FlexItem>
@@ -487,102 +365,36 @@ export const App: React.FC = () => {
               </CardTitle>
 
               <CardBody style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-                {messages.length === 0 && !notebookId ? (
-                  <EmptyState>
-                    <EmptyStateBody>
-                      Create a notebook and upload documents to start chatting.
-                    </EmptyStateBody>
-                  </EmptyState>
-                ) : messages.length === 0 ? (
-                  <EmptyState>
-                    <EmptyStateBody>
-                      Upload a document, wait for ingest, then ask a question.
-                    </EmptyStateBody>
-                  </EmptyState>
-                ) : (
-                  messages.map((msg, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: 'flex',
-                        justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                        marginBottom: 12,
-                      }}
-                    >
-                      <div
-                        style={{
-                          maxWidth: '75%',
-                          padding: '10px 14px',
-                          borderRadius: 8,
-                          background: msg.role === 'user' ? '#0066cc' : '#f0f0f0',
-                          color: msg.role === 'user' ? '#fff' : '#151515',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                          fontSize: 14,
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        {msg.content || (streaming && i === messages.length - 1 ? (
-                          <Spinner size="sm" />
-                        ) : null)}
-                        {msg.sources && msg.sources.length > 0 && (
-                          <div
-                            style={{
-                              marginTop: 8,
-                              paddingTop: 8,
-                              borderTop: '1px solid #d2d2d2',
-                              fontSize: 12,
-                            }}
-                          >
-                            <strong>Sources:</strong>
-                            <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                              {msg.sources.map((src, si) => (
-                                <li key={si}>
-                                  <a
-                                    href={src}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ color: '#06c' }}
-                                  >
-                                    {src}
-                                  </a>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                {messages.length === 0 && !notebookId
+                  ? <EmptyState><EmptyStateBody>Create a notebook to start chatting.</EmptyStateBody></EmptyState>
+                  : messages.length === 0
+                  ? <EmptyState><EmptyStateBody>Ask a question, or upload documents for RAG.</EmptyStateBody></EmptyState>
+                  : messages.map((msg, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
+                      <div style={{
+                        maxWidth: '75%', padding: '10px 14px', borderRadius: 8,
+                        background: msg.role === 'user' ? '#0066cc' : '#f0f0f0',
+                        color: msg.role === 'user' ? '#fff' : '#151515',
+                        whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14, lineHeight: 1.5,
+                      }}>
+                        {msg.content || (streaming && i === messages.length - 1 ? <Spinner size="sm" /> : null)}
                       </div>
                     </div>
-                  ))
-                )}
+                  ))}
                 <div ref={chatEndRef} />
               </CardBody>
 
               <div style={{ padding: '12px 16px', borderTop: '1px solid #d2d2d2' }}>
                 <Flex>
                   <FlexItem grow={{ default: 'grow' }}>
-                    <TextArea
-                      value={query}
-                      onChange={(_e, val) => setQuery(val)}
+                    <TextArea value={query} onChange={(_e, val) => setQuery(val)}
                       onKeyDown={handleChatKeyDown}
-                      placeholder={
-                        notebookId
-                          ? 'Ask a question about your documents...'
-                          : 'Create a notebook first'
-                      }
-                      isDisabled={!notebookId || streaming}
-                      rows={1}
-                      autoResize
-                      aria-label="Chat input"
-                    />
+                      placeholder={notebookId ? 'Ask a question...' : 'Create a notebook first'}
+                      isDisabled={!notebookId || streaming} rows={1} autoResize aria-label="Chat input" />
                   </FlexItem>
                   <FlexItem alignSelf={{ default: 'alignSelfFlexEnd' }}>
-                    <Button
-                      icon={<PaperPlaneIcon />}
-                      onClick={sendMessage}
-                      isDisabled={!notebookId || !query.trim() || streaming}
-                      isLoading={streaming}
-                    >
+                    <Button icon={<PaperPlaneIcon />} onClick={sendMessage}
+                      isDisabled={!notebookId || !query.trim() || streaming} isLoading={streaming}>
                       Send
                     </Button>
                   </FlexItem>
