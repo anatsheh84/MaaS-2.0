@@ -2,67 +2,69 @@ import logging
 from collections.abc import AsyncIterator
 
 import httpx
-from pymilvus import Collection, connections
 
 from .config import settings
-from .ingest import _collection_name, _get_embeddings
 
 logger = logging.getLogger(__name__)
 
 
-async def register_memory_bank(notebook_id: str) -> None:
-    """No-op — inference is via MaaS gateway directly, no LlamaStack memory banks needed."""
-    logger.info("register_memory_bank: no-op for notebook %s", notebook_id)
-
-
-async def unregister_memory_bank(notebook_id: str) -> None:
-    """No-op."""
-    logger.info("unregister_memory_bank: no-op for notebook %s", notebook_id)
-
-
-async def _retrieve_context(notebook_id: str, query: str) -> list[str]:
-    """Retrieve relevant chunks from Milvus for the given query."""
-    try:
-        query_embedding = await _get_embeddings([query])
-        col_name = _collection_name(notebook_id)
-        connections.connect(alias="default", uri=settings.milvus_uri)
-
-        from pymilvus import utility
-        if not utility.has_collection(col_name):
-            logger.warning("Collection %s not found — no context available", col_name)
-            return []
-
-        collection = Collection(col_name)
-        collection.load()
-
-        results = collection.search(
-            data=query_embedding,
-            anns_field="embedding",
-            param={"metric_type": "COSINE", "params": {"nprobe": 10}},
-            limit=settings.top_k_results,
-            output_fields=["text"],
+async def create_vector_store(notebook_id: str) -> str:
+    """Create a LlamaStack vector store for a notebook. Returns vector_store_id."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{settings.llamastack_url}/v1/vector_stores",
+            json={
+                "name": f"notebook_{notebook_id}",
+                "embedding_model": settings.llamastack_embedding_model,
+            },
         )
+        resp.raise_for_status()
+        vs_id = resp.json()["id"]
+        logger.info("Created vector store %s for notebook %s", vs_id, notebook_id)
+        return vs_id
+
+
+async def delete_vector_store(vector_store_id: str) -> None:
+    """Delete a LlamaStack vector store."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            await client.delete(f"{settings.llamastack_url}/v1/vector_stores/{vector_store_id}")
+        logger.info("Deleted vector store %s", vector_store_id)
+    except Exception as e:
+        logger.warning("Failed to delete vector store %s: %s", vector_store_id, e)
+
+
+async def _retrieve_context(vector_store_id: str, query: str) -> list[str]:
+    """Search vector store for relevant chunks."""
+    if not vector_store_id:
+        return []
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{settings.llamastack_url}/v1/vector_stores/{vector_store_id}/search",
+                json={"query": query, "max_num_results": settings.top_k_results},
+            )
+            resp.raise_for_status()
+            data = resp.json()
 
         chunks = []
-        for hits in results:
-            for hit in hits:
-                if hit.distance >= settings.score_threshold:
-                    chunks.append(hit.fields.get("text", ""))
-        logger.info("Retrieved %d context chunks for notebook %s", len(chunks), notebook_id)
-        return chunks
+        for item in data.get("data", []):
+            for block in item.get("content", []):
+                if block.get("type") == "text":
+                    chunks.append(block["text"])
 
+        logger.info("Retrieved %d chunks from vector store %s", len(chunks), vector_store_id)
+        return chunks
     except Exception:
-        logger.exception("Milvus retrieval failed for notebook %s", notebook_id)
+        logger.exception("Retrieval failed for vector store %s", vector_store_id)
         return []
 
 
-async def chat_stream(notebook_id: str, query: str, model: str) -> AsyncIterator[str]:
-    """Retrieve context from Milvus, inject into prompt, stream via MaaS gateway."""
+async def chat_stream(vector_store_id: str, query: str, model: str) -> AsyncIterator[str]:
+    """Retrieve context from LlamaStack, stream chat via MaaS gateway."""
 
-    # 1. Retrieve relevant context from Milvus
-    context_chunks = await _retrieve_context(notebook_id, query)
+    context_chunks = await _retrieve_context(vector_store_id, query)
 
-    # 2. Build system prompt with injected context
     if context_chunks:
         context_text = "\n\n---\n\n".join(context_chunks)
         system_content = (
@@ -74,8 +76,8 @@ async def chat_stream(notebook_id: str, query: str, model: str) -> AsyncIterator
     else:
         system_content = (
             "You are a helpful research assistant. "
-            "No document context is available — "
-            "ask the user to upload and ingest documents first."
+            "No document context is available yet. "
+            "Answer from your general knowledge, or ask the user to upload documents first."
         )
 
     messages = [
@@ -83,33 +85,21 @@ async def chat_stream(notebook_id: str, query: str, model: str) -> AsyncIterator
         {"role": "user", "content": query},
     ]
 
-    # 3. Stream via MaaS gateway OpenAI-compatible endpoint
     url = f"{settings.maas_base_url}/llm/{model}/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {settings.maas_token}",
-    }
-    logger.info("Chat: notebook=%s model=%s url=%s", notebook_id, model, url)
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings.maas_token}"}
+    logger.info("Chat: model=%s vs=%s", model, vector_store_id)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         async with client.stream(
-            "POST",
-            url,
-            headers=headers,
-            json={
-                "model": model,
-                "messages": messages,
-                "stream": True,
-                "temperature": 0.3,
-                "max_tokens": 2048,
-            },
+            "POST", url, headers=headers,
+            json={"model": model, "messages": messages, "stream": True,
+                  "temperature": 0.3, "max_tokens": 2048},
         ) as stream:
             if stream.status_code >= 400:
-                error_body = await stream.aread()
-                logger.error("MaaS gateway error %d: %s", stream.status_code, error_body)
+                body = await stream.aread()
+                logger.error("Gateway error %d: %s", stream.status_code, body)
                 yield f"{{\"error\": \"Gateway error {stream.status_code}\"}}"
                 return
-
             async for line in stream.aiter_lines():
                 if not line.startswith("data: "):
                     continue

@@ -1,8 +1,6 @@
 namespace: maas-rag
-# MaaS gateway — direct OpenAI-compatible inference, same pattern as LiteMaaS
+llamastackUrl: "http://lsd-genai-playground-service.wksp-user1.svc.cluster.local:8321"
+llamastackEmbeddingModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
 maasBaseUrl: "https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com"
-# Token injected from maas-gateway-token secret (created by configure.sh post-deploy)
-milvusUri: "http://milvus.maas-rag.svc.cluster.local:19530"
-embedEndpoint: ""
-embedModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
-doclingUrl: ""
+topKResults: "5"
+chunkSize: "512"
