@@ -5,20 +5,55 @@ import httpx
 from pymilvus import Collection, connections
 
 from .config import settings
-from .ingest import COLLECTION_DIM, _collection_name, _get_embeddings
+from .ingest import _collection_name, _get_embeddings
 
 logger = logging.getLogger(__name__)
+
+# Model name cache: short name → full LlamaStack identifier
+# e.g. "qwen3-4b-instruct" → "maas-vllm-inference-1/qwen3-4b-instruct"
+_model_map: dict[str, str] = {}
+
+
+async def _build_model_map() -> None:
+    """Fetch available LLM models from LlamaStack and build short-name lookup."""
+    global _model_map
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{settings.llamastack_url}/v1/models")
+            resp.raise_for_status()
+            models = resp.json().get("data", [])
+            _model_map = {
+                m["identifier"].split("/")[-1]: m["identifier"]
+                for m in models
+                if m.get("model_type") == "llm"
+            }
+            logger.info("LlamaStack model map built: %s", _model_map)
+    except Exception as e:
+        logger.warning("Could not build model map from LlamaStack: %s", e)
+
+
+def _resolve_model(model: str) -> str:
+    """Resolve short model name to full LlamaStack identifier."""
+    if model in _model_map.values():
+        return model  # already fully qualified
+    resolved = _model_map.get(model, model)
+    if resolved == model and _model_map:
+        logger.warning("Model '%s' not in LlamaStack map %s — using as-is", model, list(_model_map))
+    return resolved
 
 
 async def register_memory_bank(notebook_id: str) -> None:
     """No-op — memory banks removed in LlamaStack 0.3.5+.
-    RAG is now handled by Milvus retrieval + context injection in chat_stream."""
-    logger.info("register_memory_bank called for %s — no-op in this LlamaStack version", notebook_id)
+    RAG is handled by Milvus retrieval + context injection in chat_stream.
+    We use this call to (re)build the model map while we're at it."""
+    if not _model_map:
+        await _build_model_map()
+    logger.info("register_memory_bank: no-op for notebook %s", notebook_id)
 
 
 async def unregister_memory_bank(notebook_id: str) -> None:
     """No-op — memory banks removed in LlamaStack 0.3.5+."""
-    logger.info("unregister_memory_bank called for %s — no-op", notebook_id)
+    logger.info("unregister_memory_bank: no-op for notebook %s", notebook_id)
 
 
 async def _retrieve_context(notebook_id: str, query: str) -> list[str]:
@@ -49,6 +84,7 @@ async def _retrieve_context(notebook_id: str, query: str) -> list[str]:
             for hit in hits:
                 if hit.distance >= settings.score_threshold:
                     chunks.append(hit.entity.get("text", ""))
+        logger.info("Retrieved %d context chunks for notebook %s", len(chunks), notebook_id)
         return chunks
 
     except Exception:
@@ -57,12 +93,20 @@ async def _retrieve_context(notebook_id: str, query: str) -> list[str]:
 
 
 async def chat_stream(notebook_id: str, query: str, model: str) -> AsyncIterator[str]:
-    """Retrieve context from Milvus, then stream response via LlamaStack /v1/chat/completions."""
+    """Retrieve context from Milvus, inject into prompt, stream via LlamaStack /v1/chat/completions."""
 
-    # 1. Retrieve relevant context from Milvus
+    # Ensure model map is populated
+    if not _model_map:
+        await _build_model_map()
+
+    # 1. Resolve model name to full LlamaStack identifier
+    resolved_model = _resolve_model(model)
+    logger.info("Chat: notebook=%s model=%s -> %s", notebook_id, model, resolved_model)
+
+    # 2. Retrieve relevant context from Milvus
     context_chunks = await _retrieve_context(notebook_id, query)
 
-    # 2. Build system prompt with injected context
+    # 3. Build system prompt with injected context
     if context_chunks:
         context_text = "\n\n---\n\n".join(context_chunks)
         system_content = (
@@ -83,19 +127,20 @@ async def chat_stream(notebook_id: str, query: str, model: str) -> AsyncIterator
         {"role": "user", "content": query},
     ]
 
-    # 3. Stream via /v1/chat/completions
+    # 4. Stream via /v1/chat/completions
     async with httpx.AsyncClient(timeout=120.0) as client:
         async with client.stream(
             "POST",
             f"{settings.llamastack_url}/v1/chat/completions",
             json={
-                "model": model,
+                "model": resolved_model,
                 "messages": messages,
                 "stream": True,
                 "temperature": 0.3,
                 "max_tokens": 2048,
             },
         ) as stream:
+            stream.raise_for_status()
             async for line in stream.aiter_lines():
                 if not line.startswith("data: "):
                     continue
