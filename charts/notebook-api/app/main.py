@@ -34,24 +34,58 @@ async def healthz():
 
 @app.get("/models")
 async def list_models():
-    """Proxy LlamaStack /v1/models and return LLM models for the UI dropdown."""
+    """Discover deployed LLM models via the Kubernetes API (in-cluster SA token).
+    Queries LLMInferenceService resources in the llm namespace — the authoritative
+    source of what models are deployed and accessible via the MaaS gateway.
+    Falls back to LlamaStack /v1/models if Kubernetes API is unavailable.
+    """
+    # In-cluster: token and CA cert are auto-mounted by OpenShift
+    token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    k8s_host = "https://kubernetes.default.svc"
+
+    try:
+        import os
+        if os.path.exists(token_path):
+            with open(token_path) as f:
+                token = f.read().strip()
+            async with httpx.AsyncClient(timeout=10.0, verify=ca_path) as client:
+                resp = await client.get(
+                    f"{k8s_host}/apis/serving.kserve.io/v1alpha1/namespaces/llm/llminferenceservices",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                resp.raise_for_status()
+                items = resp.json().get("items", [])
+            models = [
+                {
+                    "value": item["metadata"]["name"],
+                    "label": (
+                        item["metadata"].get("annotations", {})
+                        .get("openshift.io/display-name")
+                        or item["metadata"]["name"].replace("-", " ").title()
+                    ),
+                }
+                for item in items
+                if item.get("status", {}).get("conditions", [{}])[0].get("status") != "False"
+            ]
+            logger.info("Discovered %d models from Kubernetes API", len(models))
+            return {"models": models}
+    except Exception as e:
+        logger.warning("Kubernetes API model discovery failed, falling back to LlamaStack: %s", e)
+
+    # Fallback — LlamaStack /v1/models
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{llamastack_client.settings.llamastack_url}/v1/models")
             resp.raise_for_status()
-            models = resp.json().get("data", [])
-        llm_models = [
-            {
-                "value": m["identifier"].split("/")[-1],
-                "label": m["identifier"].split("/")[-1].replace("-", " ").title(),
-                "identifier": m["identifier"],
-            }
-            for m in models
-            if m.get("model_type") == "llm"
-        ]
-        return {"models": llm_models}
+            data = resp.json().get("data", [])
+        return {"models": [
+            {"value": m["identifier"].split("/")[-1],
+             "label": m["identifier"].split("/")[-1].replace("-", " ").title()}
+            for m in data if m.get("model_type") == "llm"
+        ]}
     except Exception as e:
-        logger.warning("Could not fetch models from LlamaStack: %s", e)
+        logger.warning("LlamaStack fallback also failed: %s", e)
         return {"models": []}
 
 

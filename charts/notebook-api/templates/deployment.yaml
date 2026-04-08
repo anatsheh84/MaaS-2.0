@@ -62,5 +62,6 @@ spec:
           limits:
             cpu: {{ .Values.resources.limits.cpu | quote }}
             memory: {{ .Values.resources.limits.memory }}
+      serviceAccountName: notebook-api
       restartPolicy: Always
       terminationGracePeriodSeconds: 30
