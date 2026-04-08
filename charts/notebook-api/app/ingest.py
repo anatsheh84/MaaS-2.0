@@ -75,6 +75,7 @@ async def ingest_document(
 
         ingest_status[status_key].update({"status": "uploading", "progress": 30})
 
+        # Upload step — 60s is plenty for file transfer
         async with httpx.AsyncClient(timeout=60.0) as client:
             txt_filename = filename.rsplit(".", 1)[0] + ".txt"
             upload_resp = await client.post(
@@ -86,8 +87,12 @@ async def ingest_document(
             file_id = upload_resp.json()["id"]
             logger.info("Uploaded %s → file_id=%s", filename, file_id)
 
-            ingest_status[status_key].update({"status": "embedding", "progress": 60})
+        ingest_status[status_key].update({"status": "embedding", "progress": 60})
 
+        # Embed step — separate client with long timeout.
+        # Large files (100KB+) require LlamaStack to chunk and embed hundreds of
+        # vectors via sentence-transformers which can take several minutes.
+        async with httpx.AsyncClient(timeout=600.0) as client:
             attach_resp = await client.post(
                 f"{settings.llamastack_url}/v1/vector_stores/{vector_store_id}/files",
                 json={"file_id": file_id, "chunking_strategy": {"type": "auto"}},
