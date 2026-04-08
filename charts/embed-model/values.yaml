@@ -1,0 +1,23 @@
+# Embedding model for NotebookLM RAG
+# ────────────────────────────────────
+# Runs on CPU — no GPU, no HardwareProfile.
+
+namespace: maas-rag
+
+image: registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.5
+
+models:
+  - name: nomic-embed
+    displayName: Nomic Embed Text v1.5
+    uri: oci://registry.redhat.io/rhelai1/modelcar-nomic-embed-text-v1.5:1.5
+    replicas: 1
+    resources:
+      requests:
+        cpu: "2"
+        memory: 8Gi
+      limits:
+        cpu: "4"
+        memory: 16Gi
+    extraArgs:
+      - --task=embed
+      - --max-model-len=8192

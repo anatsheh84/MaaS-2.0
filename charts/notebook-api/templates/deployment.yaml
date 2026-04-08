@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notebook-api
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: notebook-api
+    app.kubernetes.io/name: notebook-api
+    app.kubernetes.io/part-of: notebook-api
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: notebook-api
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: notebook-api
+        app.kubernetes.io/name: notebook-api
+        app.kubernetes.io/part-of: notebook-api
+    spec:
+      containers:
+      - name: notebook-api
+        image: {{ .Values.image }}
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: notebook-api
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: {{ .Values.resources.requests.cpu }}
+            memory: {{ .Values.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.resources.limits.cpu | quote }}
+            memory: {{ .Values.resources.limits.memory }}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30

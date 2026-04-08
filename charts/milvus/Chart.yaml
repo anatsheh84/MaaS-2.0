@@ -1,0 +1,8 @@
+apiVersion: v2
+name: milvus
+description: >
+  Deploys Milvus standalone with embedded etcd and MinIO for the NotebookLM RAG feature.
+  Self-contained — no external Helm chart dependencies.
+type: application
+version: 0.1.0
+appVersion: 2.4.13

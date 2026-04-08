@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notebook-ui
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: notebook-ui
+    app.kubernetes.io/name: notebook-ui
+    app.kubernetes.io/part-of: notebook-ui
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    app: notebook-ui
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP

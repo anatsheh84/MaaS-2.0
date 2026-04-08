@@ -1,0 +1,22 @@
+# NotebookLM RAG frontend
+# ───────────────────────
+# Override in values-llmaas.yaml for cluster deployment.
+
+namespace: maas-rag
+
+image: quay.io/maas/notebook-ui:latest
+replicas: 1
+
+# Backend API base URL — the nginx reverse-proxies /api to the backend
+notebookApiUrl: "http://notebook-api.maas-rag.svc:8000"
+
+deployer:
+  domain: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

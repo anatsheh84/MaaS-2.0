@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: milvus
+  namespace: openshift-gitops
+  annotations:
+    # Wave 7 — after RHOAI and models are deployed.
+    # Milvus is the vector store for the NotebookLM RAG pipeline.
+    argocd.argoproj.io/sync-wave: "7"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/milvus
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-llmaas.yaml
+  destination:
+    name: in-cluster
+    namespace: maas-rag
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

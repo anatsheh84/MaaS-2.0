@@ -1,0 +1,8 @@
+apiVersion: v2
+name: notebook-api
+description: >
+  NotebookLM RAG backend — FastAPI service for notebook CRUD, document ingest,
+  and LlamaStack RAG chat. Connects to Milvus and the embed model.
+type: application
+version: 0.1.0
+appVersion: 0.1.0

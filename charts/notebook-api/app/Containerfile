@@ -1,0 +1,10 @@
+FROM registry.access.redhat.com/ubi9/python-311:latest
+
+COPY requirements.txt /opt/app-root/src/
+RUN pip install --no-cache-dir -r /opt/app-root/src/requirements.txt
+
+COPY . /opt/app-root/src/app/
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

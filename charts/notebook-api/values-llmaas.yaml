@@ -1,0 +1,6 @@
+namespace: maas-rag
+llamastackUrl: "http://lsd-genai-playground.admin-wkspc.svc.cluster.local:8321"
+milvusUri: "http://milvus.maas-rag.svc.cluster.local:19530"
+embedEndpoint: "http://nomic-embed-predictor.maas-rag.svc.cluster.local/v1"
+embedModel: "nomic-embed"
+doclingUrl: ""

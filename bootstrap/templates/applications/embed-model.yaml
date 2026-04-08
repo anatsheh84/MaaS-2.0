@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: embed-model
+  namespace: openshift-gitops
+  annotations:
+    # Wave 8 — after Milvus (wave 7) is healthy.
+    # Embedding model for the NotebookLM RAG pipeline.
+    argocd.argoproj.io/sync-wave: "8"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/embed-model
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-llmaas.yaml
+  destination:
+    name: in-cluster
+    namespace: maas-rag
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

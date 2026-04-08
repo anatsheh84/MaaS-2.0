@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "milvus.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "milvus.fullname" . }}
+    {{- include "milvus.labels" . | nindent 4 }}
+  annotations:
+    # Wave 2 — after etcd and MinIO (wave 0/1) are healthy.
+    # Milvus connects to both on startup; deploying before they are ready
+    # causes CrashLoopBackOff.
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: {{ include "milvus.fullname" . }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ include "milvus.fullname" . }}
+        {{- include "milvus.labels" . | nindent 8 }}
+    spec:
+      initContainers:
+      - name: wait-for-etcd
+        image: busybox:1.36
+        command: ['sh', '-c', 'until wget -qO- http://{{ include "milvus.etcdServiceName" . }}:2379/health; do echo waiting for etcd; sleep 2; done']
+      - name: wait-for-minio
+        image: busybox:1.36
+        command: ['sh', '-c', 'until wget -qO- http://{{ include "milvus.minioServiceName" . }}:9000/minio/health/live; do echo waiting for minio; sleep 2; done']
+      containers:
+      - name: milvus
+        image: {{ .Values.milvus.image }}
+        command: ["milvus"]
+        args: ["run", "standalone"]
+        env:
+        - name: ETCD_ENDPOINTS
+          value: {{ include "milvus.etcdServiceName" . }}:2379
+        - name: MINIO_ADDRESS
+          value: {{ include "milvus.minioServiceName" . }}:9000
+        ports:
+        - name: grpc
+          containerPort: 19530
+          protocol: TCP
+        - name: http-metrics
+          containerPort: 9091
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 9091
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          failureThreshold: 5
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 9091
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          failureThreshold: 3
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: {{ .Values.milvus.resources.requests.cpu }}
+            memory: {{ .Values.milvus.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.milvus.resources.limits.cpu | quote }}
+            memory: {{ .Values.milvus.resources.limits.memory }}
+        volumeMounts:
+        - name: milvus-data
+          mountPath: /var/lib/milvus
+        - name: milvus-config
+          mountPath: /milvus/configs/milvus.yaml
+          subPath: milvus.yaml
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: milvus-data
+        persistentVolumeClaim:
+          claimName: {{ include "milvus.fullname" . }}
+      - name: milvus-config
+        configMap:
+          name: {{ include "milvus.fullname" . }}

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: notebook-ui
+description: >
+  PatternFly 6 frontend for the NotebookLM RAG feature.
+  Connects to notebook-api for CRUD, ingest, and RAG chat.
+type: application
+version: 0.1.0
+appVersion: 0.1.0

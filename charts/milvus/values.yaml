@@ -1,0 +1,47 @@
+# Milvus standalone vector store for NotebookLM RAG
+# ─────────────────────────────────────────────────
+# Empty/safe defaults — override in values-llmaas.yaml for cluster deployment.
+
+namespace: maas-rag
+
+# ── Milvus ────────────────────────────────────────────────────────────────────
+milvus:
+  image: milvusdb/milvus:v2.4.13
+  storageSize: 20Gi
+  storageClass: gp3-csi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+# ── etcd (embedded, single-pod) ───────────────────────────────────────────────
+etcd:
+  image: quay.io/coreos/etcd:v3.5.16
+  storageSize: 2Gi
+  storageClass: gp3-csi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── MinIO (embedded, single-pod) ──────────────────────────────────────────────
+minio:
+  image: quay.io/minio/minio:RELEASE.2024-09-22T00-33-43Z
+  storageSize: 20Gi
+  storageClass: gp3-csi
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  defaultBucket: milvus-bucket
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi

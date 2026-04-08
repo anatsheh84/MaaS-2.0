@@ -1,0 +1,8 @@
+apiVersion: v2
+name: embed-model
+description: >
+  Deploys nomic-embed-text-v1.5 as a KServe InferenceService for document embeddings.
+  CPU-only — no GPU required. Used by the NotebookLM RAG pipeline.
+type: application
+version: 0.1.0
+appVersion: 0.1.0

@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "milvus.minioServiceName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "milvus.minioServiceName" . }}
+    {{- include "milvus.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: {{ include "milvus.minioServiceName" . }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ include "milvus.minioServiceName" . }}
+        {{- include "milvus.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: minio
+        image: {{ .Values.minio.image }}
+        command:
+        - minio
+        - server
+        - /data
+        - --console-address
+        - ":9001"
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "milvus.minioServiceName" . }}
+              key: root-user
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "milvus.minioServiceName" . }}
+              key: root-password
+        ports:
+        - name: api
+          containerPort: 9000
+          protocol: TCP
+        - name: console
+          containerPort: 9001
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: {{ .Values.minio.resources.requests.cpu }}
+            memory: {{ .Values.minio.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.minio.resources.limits.cpu }}
+            memory: {{ .Values.minio.resources.limits.memory }}
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: minio-data
+        persistentVolumeClaim:
+          claimName: {{ include "milvus.minioServiceName" . }}

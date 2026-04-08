@@ -1,0 +1,18 @@
+Milvus standalone has been deployed to namespace: {{ .Values.namespace }}
+
+Components:
+  - etcd:   {{ include "milvus.etcdServiceName" . }}.{{ .Values.namespace }}.svc:2379
+  - MinIO:  {{ include "milvus.minioServiceName" . }}.{{ .Values.namespace }}.svc:9000
+  - Milvus: {{ include "milvus.fullname" . }}.{{ .Values.namespace }}.svc:19530 (gRPC)
+             {{ include "milvus.fullname" . }}.{{ .Values.namespace }}.svc:9091  (HTTP/metrics)
+
+Verify all pods are running:
+  oc get pods -n {{ .Values.namespace }}
+
+Check Milvus health:
+  oc exec -n {{ .Values.namespace }} deploy/{{ include "milvus.fullname" . }} -- \
+    wget -qO- http://localhost:9091/healthz
+
+Test gRPC connectivity from another pod:
+  oc run milvus-test --rm -it --restart=Never -n {{ .Values.namespace }} \
+    --image=busybox:1.36 -- wget -qO- http://{{ include "milvus.fullname" . }}:9091/healthz

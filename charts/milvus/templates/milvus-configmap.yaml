@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "milvus.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "milvus.fullname" . }}
+    {{- include "milvus.labels" . | nindent 4 }}
+data:
+  milvus.yaml: |
+    etcd:
+      endpoints:
+        - {{ include "milvus.etcdServiceName" . }}:2379
+      rootPath: milvus
+
+    minio:
+      address: {{ include "milvus.minioServiceName" . }}
+      port: 9000
+      accessKeyID: {{ .Values.minio.rootUser }}
+      secretAccessKey: {{ .Values.minio.rootPassword }}
+      bucketName: {{ .Values.minio.defaultBucket }}
+      useSSL: false
+
+    log:
+      level: info
+
+    common:
+      storageType: remote

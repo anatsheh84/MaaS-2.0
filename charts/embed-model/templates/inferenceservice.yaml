@@ -1,0 +1,60 @@
+{{- range .Values.models }}
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+  annotations:
+    openshift.io/display-name: {{ .displayName }}
+    serving.kserve.io/deploymentMode: RawDeployment
+  labels:
+    opendatahub.io/dashboard: "true"
+spec:
+  predictor:
+    model:
+      modelFormat:
+        name: vLLM
+      storageUri: {{ .uri }}
+    minReplicas: {{ .replicas | default 1 }}
+    maxReplicas: {{ .replicas | default 1 }}
+    containers:
+    - name: kserve-container
+      image: {{ .image | default $.Values.image }}
+      command:
+      - python
+      - -m
+      - vllm.entrypoints.openai.api_server
+      args:
+      - "--served-model-name={{ .name }}"
+      - --model=/mnt/models
+      {{- toYaml .extraArgs | nindent 6 }}
+      ports:
+      - containerPort: 8000
+        name: http
+        protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 120
+        periodSeconds: 30
+        failureThreshold: 5
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 60
+        periodSeconds: 15
+        failureThreshold: 3
+      resources:
+        {{- toYaml .resources | nindent 8 }}
+      volumeMounts:
+      - mountPath: /dev/shm
+        name: shm
+    volumes:
+    - emptyDir:
+        medium: Memory
+        sizeLimit: 2Gi
+      name: shm
+{{- end }}

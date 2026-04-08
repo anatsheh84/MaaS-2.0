@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: notebook-api
+  namespace: openshift-gitops
+  annotations:
+    # Wave 9 — after Milvus + embed model are healthy.
+    # NotebookLM RAG backend — depends on Milvus, embed model, and LlamaStack.
+    argocd.argoproj.io/sync-wave: "9"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/notebook-api
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-llmaas.yaml
+  destination:
+    name: in-cluster
+    namespace: maas-rag
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

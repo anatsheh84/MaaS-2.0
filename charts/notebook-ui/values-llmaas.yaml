@@ -1,0 +1,2 @@
+namespace: maas-rag
+notebookApiUrl: "http://notebook-api.maas-rag.svc.cluster.local:8000"
