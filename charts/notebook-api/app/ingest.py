@@ -20,7 +20,7 @@ ingest_status: dict[str, dict[str, Any]] = {}
 # Must match the embedding model registered in LlamaStack (nomic-embed-text-v1.5, 768-dim).
 _EMBED_MODEL_NAME = os.getenv("EMBED_MODEL_NAME", "nomic-ai/nomic-embed-text-v1.5")
 logger.info("Loading embedding model: %s", _EMBED_MODEL_NAME)
-_embed_model = SentenceTransformer(_EMBED_MODEL_NAME)
+_embed_model = SentenceTransformer(_EMBED_MODEL_NAME, trust_remote_code=True)
 COLLECTION_DIM = _embed_model.get_sentence_embedding_dimension()
 logger.info("Embedding model loaded — dimension: %d", COLLECTION_DIM)
 
