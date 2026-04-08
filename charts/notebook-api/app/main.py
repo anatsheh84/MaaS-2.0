@@ -294,50 +294,43 @@ async def chat(
     model_id = None  # will use settings.llamastack_model_id default
 
     async def stream_gen():
-        """Convert Responses API events to OpenAI chat.completions streaming format.
-
-        The existing UI parses choices[0].delta.content from each SSE chunk.
-        We extract text deltas from response.output_text.delta events and
-        re-wrap them in the expected format.
+        """Use non-streaming Responses API (streaming has a LlamaStack v0.3.5 bug
+        where file_search results aren't injected into the model context).
+        Convert the complete response to SSE events for the UI.
         """
         import json as _json
 
-        async for chunk in llamastack_client.responses_stream(
-            query=body.query,
-            vector_store_ids=[notebook_id],
-            model=model_id or None,
-        ):
-            try:
-                event = _json.loads(chunk)
-            except (ValueError, TypeError):
-                continue
+        try:
+            result = await llamastack_client.responses_sync(
+                query=body.query,
+                vector_store_ids=[notebook_id],
+                model=model_id or None,
+            )
 
-            event_type = event.get("type", "")
-
-            # Extract text delta tokens and re-wrap as chat.completions format
-            if event_type == "response.output_text.delta":
-                delta_text = event.get("delta", "")
-                if delta_text:
-                    compat = {
-                        "choices": [{
-                            "index": 0,
-                            "delta": {"content": delta_text},
-                        }],
-                    }
-                    yield f"data: {_json.dumps(compat)}\n\n"
-
-            # Forward errors from failed or completed responses
-            elif event_type in ("response.failed", "response.completed"):
-                resp = event.get("response", {})
-                if resp.get("error"):
-                    error_msg = resp["error"].get("message", "Unknown error")
-                    compat = {
-                        "choices": [{
-                            "index": 0,
-                            "delta": {"content": f"\n\n⚠️ Error: {error_msg}"},
-                        }],
-                    }
-                    yield f"data: {_json.dumps(compat)}\n\n"
+            # Check for errors
+            if result.get("error"):
+                error_msg = result["error"].get("message", "Unknown error")
+                compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {error_msg}"}}]}
+                yield f"data: {_json.dumps(compat)}\n\n"
+            elif result.get("status") == "failed":
+                error_msg = result.get("error", {}).get("message", "Response failed")
+                compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {error_msg}"}}]}
+                yield f"data: {_json.dumps(compat)}\n\n"
+            else:
+                # Extract text from the response output
+                for output in result.get("output", []):
+                    if output.get("type") == "message":
+                        for content in output.get("content", []):
+                            if content.get("type") == "output_text":
+                                text = content.get("text", "")
+                                # Send as a single chunk (non-streaming)
+                                if text:
+                                    compat = {"choices": [{"index": 0, "delta": {"content": text}}]}
+                                    yield f"data: {_json.dumps(compat)}\n\n"
+        except Exception as e:
+            logger.exception("Chat error for notebook %s", notebook_id)
+            compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {e}"}}]}
+            yield f"data: {_json.dumps(compat)}\n\n"
 
         yield "data: [DONE]\n\n"
 
