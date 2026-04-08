@@ -4,7 +4,7 @@
 
 namespace: maas-rag
 
-image: quay.io/anatsheh84/notebook-api:v2
+image: quay.io/anatsheh84/notebook-api:openshift-build
 replicas: 1
 
 # Upstream service URLs — defaults assume all services in maas-rag namespace
