@@ -47,7 +47,7 @@ async def _retrieve_context(notebook_id: str, query: str) -> list[str]:
         for hits in results:
             for hit in hits:
                 if hit.distance >= settings.score_threshold:
-                    chunks.append(hit.entity.get("text", ""))
+                    chunks.append(hit.fields.get("text", ""))
         logger.info("Retrieved %d context chunks for notebook %s", len(chunks), notebook_id)
         return chunks
 
