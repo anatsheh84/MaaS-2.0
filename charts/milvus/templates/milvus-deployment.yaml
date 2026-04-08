@@ -10,7 +10,6 @@ metadata:
     # Wave 2 — after etcd and MinIO (wave 0/1) are healthy.
     # Milvus connects to both on startup; deploying before they are ready
     # causes CrashLoopBackOff.
-    argocd.argoproj.io/sync-wave: "2"
 spec:
   replicas: 1
   revisionHistoryLimit: 0
