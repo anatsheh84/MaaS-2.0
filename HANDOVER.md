@@ -1,228 +1,326 @@
-# MaaS 2.0 GitOps Deployment — Handover Document
-
-## Context & Role
-You are continuing an active deployment session for Ziko, a Principal Solution Architect at Red Hat KSA.
-The platform is **MaaS 2.0** — a fully GitOps-driven Models-as-a-Service platform on OpenShift AI.
-All actions use Desktop Commander (`start_process`) with `oc` CLI. Git changes go through the local clone.
-Ziko runs commands personally and reports output — your role is analysis, fix design, and repo commits.
+# MaaS 2.0 — Handover Document
+**Date:** 2026-04-08  
+**Cluster:** `https://api.cluster-ttpwl.ttpwl.sandbox962.opentlc.com:6443`  
+**Repo:** `https://github.com/anatsheh84/MaaS-2.0` | Local: `/Users/aelnatsh/Lab/MaaS`  
+**Latest commit:** `f138e41`  
+**Apps domain:** `apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com`
 
 ---
 
-## Environment
+## Cluster Credentials
 
-| Item | Value |
+```bash
+oc login https://api.cluster-ttpwl.ttpwl.sandbox962.opentlc.com:6443 \
+  --username=admin --password=<admin-password>
+```
+
+Users: `user1` / `user2` / `admin` / `kube:admin`  
+Identity provider: `htpasswd-maas`
+
+---
+
+## Platform Overview
+
+GitOps-driven MaaS 2.0 platform on OpenShift AI. All components managed by ArgoCD
+(`openshift-gitops`). Bootstrap app at `setup/bootstrap.yaml`.
+
+**Active models** (namespace: `llm`, g6e.12xlarge, 4× NVIDIA L40S):
+- `qwen3-4b-instruct`
+- `llama-3-1-8b-instruct-fp8`
+- `mistral-small-24b-fp8`
+- `phi-4-instruct-w8a8`
+
+**MaaS gateway:** `https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com`  
+**Gateway auth:** Kuadrant `kubernetesTokenReview`, audience `maas-default-gateway-sa`
+
+**Tier rate limits** (Kuadrant `RateLimitPolicy`, counter per `auth.identity.userid`):
+- `free` → 5 req / 2 min
+- `premium` → 20 req / 2 min
+- `enterprise` → no limit
+
+**Tier SA namespaces:**
+- `maas-default-gateway-tier-free` → `kube-admin-81378af5`
+- `maas-default-gateway-tier-premium` → `user1-b3daa77b`
+- user2 has NO tier SA yet (falls back to shared free token — see Pending Items)
+
+---
+
+## RAG Notebook App (namespace: `maas-rag`)
+
+**UI:** `https://notebook.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com`  
+**Auth:** OpenShift OAuth via `oauth-proxy` sidecar (2/2 containers in notebook-ui pod)  
+**notebook-api:** Internal only — no public Route. Reachable via nginx proxy at `/api/`
+
+### Architecture
+
+```
+Browser → oauth-proxy:4180 (OpenShift login redirect)
+               ↓ X-Forwarded-User: username
+          nginx:8080 (serves React UI, proxies /api/ to notebook-api)
+               ↓
+          notebook-api:8000 (FastAPI)
+               ↓ K8s API: find user's tier SA → TokenRequest
+          MaaS gateway (per-user token, tier-enforced)
+               ↓
+          LlamaStack (wksp-user1) → vLLM inference
+          Milvus (vector store, gp3-csi PVCs)
+```
+
+### Key Components
+
+| Resource | Namespace | Notes |
+|---|---|---|
+| `notebook-api` Deployment | `maas-rag` | SA: `notebook-api`, FastAPI |
+| `notebook-ui` Deployment | `maas-rag` | 2 containers: oauth-proxy + nginx |
+| `milvus` Deployment | `maas-rag` | Vector store, gp3-csi PVCs |
+| `notebook-ui-proxy` Secret | `maas-rag` | oauth-proxy cookie secret |
+| `maas-gateway-token` Secret | `maas-rag` | Shared fallback free-tier token |
+| `notebook-api` SA | `maas-rag` | RBAC: list LLMInferenceServices in `llm`; list/token SAs in tier namespaces |
+
+### Per-User Token Flow
+
+```
+X-Forwarded-User: user1
+  → _get_cached_user_token("user1")
+  → scan tier namespaces for SA starting with "user1-"
+  → found: user1-b3daa77b in maas-default-gateway-tier-premium
+  → TokenRequest API → 1h token (audience: maas-default-gateway-sa)
+  → cached in memory with TTL refresh at expiry-5min
+  → used for MaaS gateway calls → premium rate limits applied
+```
+
+If no tier SA found → falls back to shared `maas-gateway-token` (free tier, 5 req/2min shared).
+
+### notebook-api Endpoints
+
+| Endpoint | Notes |
 |---|---|
-| **Repo** | `https://github.com/anatsheh84/MaaS-2.0` (branch: `main`) |
-| **Local clone** | `/Users/aelnatsh/Lab/MaaS` |
-| **Cluster API** | `https://api.cluster-66k9k.66k9k.sandbox5291.opentlc.com:6443` |
-| **kubeadmin password** | `UXhDv-Ac2r7-8ghvp-p2TEg` |
-| **Cluster domain** | `apps.cluster-66k9k.66k9k.sandbox5291.opentlc.com` |
-| **AWS AZ** | `us-east-2b` |
-| **Hosted Zone ID** | `Z09995911COTKS4VI7RXG` |
-| **ArgoCD URL** | `https://openshift-gitops-server-openshift-gitops.apps.cluster-66k9k.66k9k.sandbox5291.opentlc.com` |
-| **ArgoCD admin password** | `Gha7EnSYkDmU49b1CtAgPWey5JucopXs` |
+| `GET /models` | Lists active LLMInferenceServices from K8s API |
+| `POST /notebooks` | Creates notebook + LlamaStack vector store |
+| `POST /notebooks/{id}/documents` | Upload + ingest (embed timeout: 600s for large files) |
+| `POST /notebooks/{id}/chat` | SSE streaming chat, uses per-user token |
+| `GET /user-token/{username}` | Returns tier SA token — internal use only |
 
 ---
 
-## Platform Architecture
 
-The MaaS stack deploys via ArgoCD app-of-apps (bootstrap chart). Components:
-- **MachineSets** — GPU worker nodes on AWS
-- **cert-manager** — TLS certificates via Let's Encrypt + Route53
-- **NVIDIA GPU enablement** — NFD + GPU Operator
-- **OpenShift AI (RHOAI) 3.2** — DataScienceCluster + KServe for model serving
-- **Models** — LLMInferenceService CRs per model, served via vLLM
-- **MaaS API** — Multi-tenant API gateway with Kuadrant auth (TokenReview + SubjectAccessReview)
-- **RHCL/Kuadrant** — Rate limiting + AuthPolicy per tier (free/premium/enterprise)
-- **LlamaStack** — Per-user playground instances (wksp-user1, wksp-user2, admin-wkspc)
-- **Model Registry** — `maas-registry` in `rhoai-model-registries` namespace with self-contained Postgres
-- **Grafana** — 3 dashboards: maas-lab, SDAIA Phase 1, SDAIA Principles View
-- **LiteMaaS** — LiteLLM-based frontend in `litemaas` namespace
-- **DevSpaces, Slack MCP, Kubernetes MCP** — Supporting services
+## LlamaStack Instances
 
-### Key Principles (enforce these always)
-1. **All fixes must be in Git** — no manual cluster changes without a repo commit
-2. **Never touch what an operator owns** — don't pre-create operator-managed resources
-3. **`gpu_memory_utilization=0.95` for all models** — each pod gets exclusive GPU on g6e.12xlarge
-4. **`RespectIgnoreDifferences=true` on machinesets** — allows GUI scaling without ArgoCD reverting
-
----
-
-## GPU Nodes (Current State)
-
-| MachineSet | Instance | GPUs | Replicas | Status |
-|---|---|---|---|---|
-| `worker-gpu-g6e-2xlarge-us-east-2b` | g6e.2xlarge | 1× L40S (46GB) | 0 | **Scaled down** |
-| `worker-gpu-g6e-12xlarge-us-east-2b` | g6e.12xlarge | 4× L40S (184GB) | 1 | **Running** |
-
-Each model pod gets **exclusive access to one GPU** — no MIG, no time-slicing.
-
----
-
-## Models Currently Deployed
-
-All models in `charts/models/values.yaml`. All use `nvidia-l40s-single-gpu` HardwareProfile.
-Runtime image: `registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.5`
-
-| Name | URI | GPU mem | Context | Tool parser | Status |
-|---|---|---|---|---|---|
-| `qwen3-4b-instruct` | `oci://quay.io/jharmison/models:qwen--qwen3-4b-instruct-2507-modelcar` | 0.95 | 131072 | hermes | ✅ Ready |
-| `llama-3-1-8b-instruct-fp8` | `oci://registry.redhat.io/rhelai1/modelcar-llama-3-1-8b-instruct-fp8-dynamic:1.5` | 0.95 | 131072 | llama3_json | ✅ Ready |
-| `mistral-small-24b-fp8` | `oci://registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503-fp8-dynamic:1.5` | 0.95 | 65536 | mistral | ✅ Ready |
-| `phi-4-instruct-w8a8` | `oci://registry.redhat.io/rhelai1/modelcar-phi-4-quantized-w8a8:1.5` | 0.95 | 16384 | hermes | ✅ Ready |
-
-### Model Notes
-- Mistral FP8: do NOT add `--tokenizer-mode=mistral` — uses HuggingFace tokenizer, not Mistral-native
-- Phi-4: 16K context window — smallest of the 4; max_tokens capped at 16384
-- All 4 models serve via MaaS gateway at `http://maas.apps.cluster-66k9k.../llm/<name>/v1`
-
----
-
-## ArgoCD Application Status (last known good)
-
-| Application | Sync | Health | Notes |
+| Namespace | Service | Port | User |
 |---|---|---|---|
-| `bootstrap` | Synced | Healthy | App-of-apps |
-| `openshift-ai` | Synced | Healthy | |
-| `models` | Synced | Healthy | 4 models |
-| `model-registry` | OutOfSync | Healthy | CR spec matches; diff is cosmetic (operator annotation drift). CR is `Available=True`, registry is fully functional. |
-| `grafana` | Synced | Healthy | 3 dashboards |
-| `machinesets` | OutOfSync | Healthy | Cosmetic — replica ignoreDifferences |
-| `slack-mcp` | Synced | Progressing | Needs `slack-mcp-token` secret manually |
+| `wksp-user1` | `lsd-genai-playground-service` | 8321 | user1 |
+| `wksp-user2` | `lsd-genai-playground-service` | 8321 | user2 |
+| `mydsproject` | `lsd-genai-playground-service` | 8321 | admin |
+
+**notebook-api uses:** `lsd-genai-playground-service.wksp-user1.svc.cluster.local:8321`
 
 ---
 
-## HTPasswd Users
+## 🔴 CRITICAL PENDING ISSUE — LlamaStack VLLM Token
 
-| User | Password (base64) | Groups | Rate limit |
-|---|---|---|---|
-| `user1` | `MTkxNDU3` | `tier-premium-users` | 20 req/2min |
-| `user2` | `MTkxNDU3` | `tier-premium-users` | 20 req/2min |
-| `admin` | `NDcxOTE3` | `tier-enterprise-users`, `rhods-admins` | **Unlimited** |
+### Problem
+`VLLM_API_TOKEN_1: fake` is hardcoded in the `LlamaStackDistribution` CR.
+LlamaStack refreshes its model list from the MaaS gateway every 5 minutes using this
+token. When `fake` hits Kuadrant's `kubernetesTokenReview` it returns **401**.
+After several failed refreshes, inference requests also fail with 401.
 
-**Important**: Use `admin` (not `kubeadmin`) for RHOAI playground — kubeadmin is tier-free only.
+**This is why chat breaks for all users after ~5 minutes of a fresh LlamaStack pod.**
 
----
+### What Was Done
+- ✅ `llamastack-vllm-token` secret created in all 3 wksp namespaces with real 8760h SA token
+- ✅ Chart updated: `charts/llama-stack-instance/templates/llamastack-distribution.yaml`
+  now uses `valueFrom.secretKeyRef` pointing to `llamastack-vllm-token`
+- ✅ ArgoCD synced — `LlamaStackDistribution` CR now has `valueFrom.secretKeyRef`
+- ❌ **The `LlamaStackDistribution` operator does NOT propagate `valueFrom` to the Deployment**
+  It only renders `value: fake` into the Deployment spec regardless of what the CR says
 
-## Rate Limiting (Kuadrant `gateway-rate-limits` RateLimitPolicy)
+### Root Cause of Operator Limitation
+The operator (`registry.redhat.io/rhoai/odh-llama-stack-k8s-operator-rhel9`) reads
+`env[].value` fields from the CR and writes them verbatim to the Deployment.
+It does not pass through `valueFrom.secretKeyRef` — this is a bug/limitation in the
+operator version `0.4.0` on this cluster.
 
-| Tier | Limit | Users |
-|---|---|---|
-| `free` | 5 req / 2min | `system:authenticated` default |
-| `premium` | 20 req / 2min | user1, user2 |
-| `enterprise` | **No limit** | admin |
+### Resolution Options (pick one)
 
-Enterprise limit was removed (was 50/2min) to prevent LlamaStack agentic tool calls from hitting the ceiling.
+**Option A — Patch Deployment directly + add ignoreDifferences to ArgoCD**
+```bash
+# Get real token
+TOKEN=$(oc get secret llamastack-vllm-token -n wksp-user1 \
+  -o jsonpath='{.data.token}' | base64 -d)
 
----
+# Patch deployment directly
+oc set env deployment/lsd-genai-playground \
+  VLLM_API_TOKEN_1="$TOKEN" -n wksp-user1
 
-## LlamaStack Playground
+# Also patch wksp-user2 and mydsproject
+```
+Then add `ignoreDifferences` to the `llama-stack-instance-user1` ArgoCD app so it
+doesn't revert the env var on next sync.
 
-| Namespace | User | VLLM_MAX_TOKENS | Model provider | Status |
-|---|---|---|---|---|
-| `wksp-user1` | user1 | 8192 | Single: qwen3-4b only | Running |
-| `wksp-user2` | user2 | 8192 | Single: qwen3-4b only | Running |
-| `admin-wkspc` | admin | 4096 (dashboard-managed, fights patches) | Single: llama-3-1-8b only | Running |
+**Option B — Patch the LlamaStackDistribution CR with literal token value**
+```bash
+TOKEN=$(oc get secret llamastack-vllm-token -n wksp-user1 \
+  -o jsonpath='{.data.token}' | base64 -d)
 
-### Pending: LlamaStack Multi-Model Support
-All three instances currently have only ONE inference provider. The fix is to update
-`charts/llama-stack-instance/templates/configmap.yaml` to loop over the models list.
-See the agreed approach in `charts/llama-stack-instance/` values files.
+oc patch llamastackdistribution lsd-genai-playground -n wksp-user1 \
+  --type=merge \
+  -p "{\"spec\":{\"server\":{\"containerSpec\":{\"env\":[
+    {\"name\":\"VLLM_TLS_VERIFY\",\"value\":\"false\"},
+    {\"name\":\"MILVUS_DB_PATH\",\"value\":\"~/.llama/milvus.db\"},
+    {\"name\":\"FMS_ORCHESTRATOR_URL\",\"value\":\"http://localhost\"},
+    {\"name\":\"VLLM_MAX_TOKENS\",\"value\":\"8192\"},
+    {\"name\":\"VLLM_API_TOKEN_1\",\"value\":\"$TOKEN\"},
+    {\"name\":\"LLAMA_STACK_CONFIG_DIR\",\"value\":\"/opt/app-root/src/.llama/distributions/rh/\"}
+  ]}}}}"
+```
+**This is the recommended option** — the operator WILL propagate a literal `value`
+to the Deployment. Token is 8760h (1 year) so refresh is not an issue.
+Repeat for `wksp-user2` and `mydsproject`.
 
-### admin-wkspc VLLM_MAX_TOKENS issue
-The `admin-wkspc` LlamaStackDistribution is managed by the RHOAI GenAI Studio dashboard (not GitOps).
-Patching the CR or Deployment is reverted by the dashboard controller within seconds.
-To change `VLLM_MAX_TOKENS` for admin: use the RHOAI Dashboard UI → GenAI Studio → edit the playground.
-Recommended value: **16384** (safe for all models except phi-4 with long history).
+**Verification after fix:**
+```bash
+# Confirm token is real in pod env
+oc exec -n wksp-user1 deployment/lsd-genai-playground -- \
+  sh -c 'echo "token: ${VLLM_API_TOKEN_1:0:20}..."'
+# Should NOT print "token: fake..."
 
----
-
-## Model Registry (`maas-registry`)
-
-Deployed via `charts/model-registry/` chart, ArgoCD app `model-registry`.
-- Namespace: `rhoai-model-registries`
-- Postgres: `maas-registry-postgres` Deployment + 10Gi gp3-csi PVC
-- REST API: `maas-registry` pod, port 8080, route enabled
-- DB password: `maas-registry-db-2024` (in `maas-registry-postgres` Secret)
-- Status: `Available=True`, ArgoCD shows OutOfSync cosmetically due to operator annotation drift
-  - `ignoreDifferences` covers `/spec/rest/image`, `/spec/rest/resources`, `/spec/grpc/image`,
-    `/spec/postgres/image`, `/status`, `/metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration`
-
-### Known ArgoCD OutOfSync Behaviour
-The ModelRegistry operator mutates the CR after every ArgoCD sync, writing a `last-applied-configuration`
-annotation that includes operator-injected status fields. This creates a permanent diff cycle.
-The registry is **fully functional** regardless. This is a known RHOAI 3.2 / ArgoCD interaction issue.
-
----
-
-## LiteMaaS
-
-Deployed in `litemaas` namespace. LiteLLM proxy in front of all 4 MaaS models.
-
-| Model name in LiteLLM | MaaS endpoint | Provider |
-|---|---|---|
-| `Qwen-local-4B` | `.../llm/qwen3-4b-instruct/v1` | openai |
-| `Llama-local-8B` | `.../llm/llama-3-1-8b-instruct-fp8/v1` | openai |
-| `Mistral-local-24B` | `.../llm/mistral-small-24b-fp8/v1` | openai |
-| `Phi-4-local` | `.../llm/phi-4-instruct-w8a8/v1` | openai |
-
-All use enterprise-tier SA tokens (1-year, audience=`maas-default-gateway-sa`).
-LiteLLM master key: `sk-b0c603570f0ad9ab801879bb88a821de55b0c247d53cc57d`
-LiteMaaS URL: `https://litemaas-litemaas.apps.cluster-66k9k.66k9k.sandbox5291.opentlc.com`
+# Confirm no more 401 errors
+oc logs -n wksp-user1 deployment/lsd-genai-playground --tail=10 | \
+  grep -E "401|Error|Model refresh"
+# Should be empty
+```
 
 ---
 
-## Hardware Profile
 
-`HardwareProfile/nvidia-l40s-single-gpu` in `redhat-ods-applications`:
-- 1× `nvidia.com/gpu` (L40S)
-- CPU: default 4, max 6 | Memory: default 32Gi, max 48Gi
-- nodeSelector: `nvidia.com/gpu.present: "true"`
-- toleration: `nvidia.com/gpu=l40-gpu:NoSchedule`
-- Annotation key: `opendatahub.io/hardware-profile-name` (NOT `alpha.kubeflow.org/...`)
+## Other Pending Items
+
+### 1. user2 Has No Tier SA
+user2 is in `tier-premium-users` group but has no SA in any tier namespace.
+Chat works but falls back to shared free-tier token (5 req/2min shared).
+
+**Fix:** Create SA via maas-api onboarding flow, or manually:
+```bash
+HASH=$(echo -n "user2" | sha256sum | cut -c1-8)
+oc create sa user2-${HASH} -n maas-default-gateway-tier-premium
+oc label sa user2-${HASH} -n maas-default-gateway-tier-premium \
+  app.kubernetes.io/component=token-issuer \
+  app.kubernetes.io/part-of=maas-api \
+  maas.opendatahub.io/instance=maas-default-gateway \
+  maas.opendatahub.io/tier=premium
+```
+
+### 2. kube:admin Username Normalization Bug
+`kube:admin` has a colon but the tier SA is named `kube-admin-81378af5` (hyphen).
+The SA lookup uses `sa_name.startswith(f"{username}-")` which fails because
+`"kube-admin-...".startswith("kube:admin-")` is False.
+
+**Fix in `_get_user_maas_token` in `charts/notebook-api/app/main.py`:**
+```python
+# Normalize username — OpenShift uses "kube:admin" but SA names use hyphens
+normalized_username = username.replace(":", "-")
+user_sa = next(
+    (sa for sa in items if sa["metadata"]["name"].startswith(f"{normalized_username}-")),
+    None,
+)
+```
+
+### 3. Notebook State is In-Memory Only
+`notebooks: dict[str, dict] = {}` in `main.py` — wiped on pod restart.
+Vector stores persist in Milvus PVCs but notebook metadata is lost.
+Users must create a new notebook after any pod restart.
+
+**Fix:** Add SQLite or Redis persistence for the `notebooks` dict and `ingest_status`.
+
+### 4. UI Has No 404 Error Handling
+When a notebook ID no longer exists (pod restart), chat silently fails.
+The UI needs to detect HTTP 404 responses and prompt user to create a new notebook.
+
+### 5. mydsproject LlamaStack Not in ArgoCD
+`mydsproject` has a LlamaStack instance but no ArgoCD app manages it.
+The `llamastack-vllm-token` secret was created manually.
+Consider adding a `workspace-mydsproject` ArgoCD app mirroring `workspace-user1/2`.
 
 ---
 
-## Key File Paths
+## Key Files
 
 | File | Purpose |
 |---|---|
-| `charts/models/values.yaml` | Model list — 4 models including phi-4 |
-| `charts/openshift-ai/values-llmaas.yaml` | HardwareProfiles, DataScienceCluster, dashboardConfig |
-| `charts/model-registry/values-llmaas.yaml` | Model Registry instance definition |
-| `charts/model-registry/templates/` | Postgres + ModelRegistry CR templates |
-| `charts/llama-stack-instance/templates/configmap.yaml` | LlamaStack run.yaml template (single model — needs multi-model update) |
-| `charts/llama-stack-instance/values.yaml` | Default values (deployer.domain, model.name) |
-| `charts/grafana/templates/dashboard-sdaia-phase1.yaml` | SDAIA Governance Phase 1 dashboard |
-| `charts/grafana/templates/dashboard-sdaia-principles-view.yaml` | SDAIA Principles compliance dashboard |
-| `bootstrap/templates/applications/` | All ArgoCD Application/ApplicationSet definitions |
-| `bootstrap/values.yaml` | Cluster-agnostic defaults |
-| `setup/configure.sh` | 7-step cluster bootstrap script |
+| `charts/notebook-api/app/main.py` | FastAPI app, per-user token, token cache, model discovery |
+| `charts/notebook-api/app/llamastack_client.py` | Vector store, RAG retrieval, streaming chat |
+| `charts/notebook-api/app/ingest.py` | PDF/DOCX text extraction, LlamaStack file upload + embed |
+| `charts/notebook-api/app/config.py` | Settings: llamastackUrl, maasBaseUrl, maasToken, tierNamespaces |
+| `charts/notebook-api/templates/rbac.yaml` | SA + Roles for LLMInferenceService list + tier SA tokens |
+| `charts/notebook-ui/templates/deployment.yaml` | oauth-proxy sidecar + nginx |
+| `charts/notebook-ui/templates/sa.yaml` | SA with oauth-redirectreference annotation |
+| `charts/llama-stack-instance/templates/llamastack-distribution.yaml` | LlamaStack CR (valueFrom not propagated by operator — see issue above) |
+| `setup/configure.sh` | Full deployment automation script |
 
 ---
 
-## Pending Work
+## Standard Operations
 
-1. **LlamaStack multi-model configmap** — update `charts/llama-stack-instance/templates/configmap.yaml`
-   to loop over models list (see original HANDOVER for test ConfigMap structure and approach)
-2. **admin-wkspc VLLM_MAX_TOKENS** — set to 16384 via RHOAI Dashboard UI (not patchable via oc)
-3. **model-registry OutOfSync** — cosmetic only; investigate if newer RHOAI or ArgoCD version resolves
+### Rebuild notebook-api
+```bash
+oc start-build notebook-api -n maas-rag
+# Watch: oc get builds -n maas-rag -w
+oc rollout restart deployment/notebook-api -n maas-rag
+```
+
+### Rebuild notebook-ui
+```bash
+oc start-build notebook-ui -n maas-rag
+oc rollout restart deployment/notebook-ui -n maas-rag
+```
+
+### ArgoCD hard refresh + force sync
+```bash
+oc annotate application <app-name> -n openshift-gitops \
+  argocd.argoproj.io/refresh=hard --overwrite
+sleep 20
+oc patch application <app-name> -n openshift-gitops --type merge \
+  -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"HEAD","prune":true}}}'
+```
+
+### Suspend ArgoCD selfHeal (before live cluster edits)
+```bash
+oc patch application <app-name> -n openshift-gitops --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":false,"prune":true}}}}'
+# ... make changes ...
+# Re-enable:
+oc patch application <app-name> -n openshift-gitops --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":true,"prune":true}}}}'
+```
+
+### Check notebook-api logs
+```bash
+oc logs -n maas-rag deployment/notebook-api -f | \
+  grep -E "per-user token|fallback|Ingest|ERROR|401|429"
+```
+
+### Check oauth-proxy auth
+```bash
+oc logs -n maas-rag -l app=notebook-ui -c oauth-proxy | \
+  grep "authentication complete"
+```
 
 ---
 
-## Recent Commit History
+## Git Workflow — ALWAYS Local First
 
+```bash
+# Always pull before editing
+cd /Users/aelnatsh/Lab/MaaS
+git pull origin main
+
+# Edit files locally
+# Commit and push
+git add <files>
+git commit -m "feat/fix: description"
+git push origin main
 ```
-7a04fb8 fix(grafana): escape Helm template delimiters in SDAIA dashboard legendFormat fields
-1babeae feat(grafana): add SDAIA AI Ethics Principles compliance view dashboard
-743734e feat(grafana): add SDAIA AI Governance Phase 1 dashboard (Principles 5 & 7)
-a22cd8f fix(model-registry): remove ServerSideApply — use ignoreDifferences for last-applied-configuration
-95142b5 fix(model-registry): use ServerSideApply=true to prevent last-applied-configuration drift
-44400e2 fix(model-registry): remove sync-wave from CR + ignore annotation drift
-c3c3313 fix(model-registry): add sslMode=disable to CR + ignoreDifferences for operator-injected fields
-b6f0e63 fix(model-registry): self-contained chart — own Postgres + correct ModelRegistry CR spec
-f5aa21b feat(model-registry): dedicated chart + ArgoCD Application targeting rhoai-model-registries
-ff7c55e feat(openshift-ai): add Model Registry via GitOps — data-driven CR template
-c3b152f fix(rate-limit): remove enterprise tier limit — admin/enterprise users are now unlimited
-f1b85bf feat(models): add phi-4-instruct-w8a8 as fourth model on 4th L40S GPU
-```
+
+**NEVER use GitHub API (`github:push_files` / `github:create_or_update_file`) directly
+for code changes — always go through local git to avoid conflicts.**
+
