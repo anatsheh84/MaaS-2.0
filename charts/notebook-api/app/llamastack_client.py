@@ -1,3 +1,9 @@
+"""LlamaStack client — thin wrapper around native OpenAI-compatible APIs.
+
+All RAG operations (files, vector stores, responses) go through LlamaStack.
+LlamaStack handles chunking, embedding, retrieval, and inference internally
+using its enterprise-tier gateway token (no rate limits).
+"""
 import logging
 from collections.abc import AsyncIterator
 
@@ -7,105 +13,193 @@ from .config import settings
 
 logger = logging.getLogger(__name__)
 
+_BASE = settings.llamastack_url
 
-async def create_vector_store(notebook_id: str) -> str:
-    """Create a LlamaStack vector store for a notebook. Returns vector_store_id."""
+
+# ── Vector Stores (= Notebooks) ────────────────────────────────────────────
+
+async def create_vector_store(name: str) -> dict:
+    """Create a vector store. Returns the full VS object."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
-            f"{settings.llamastack_url}/v1/vector_stores",
+            f"{_BASE}/v1/vector_stores",
             json={
-                "name": f"notebook_{notebook_id}",
+                "name": name,
                 "embedding_model": settings.llamastack_embedding_model,
             },
         )
         resp.raise_for_status()
-        vs_id = resp.json()["id"]
-        logger.info("Created vector store %s for notebook %s", vs_id, notebook_id)
-        return vs_id
+        vs = resp.json()
+        logger.info("Created vector store %s (name=%s)", vs["id"], name)
+        return vs
 
 
-async def delete_vector_store(vector_store_id: str) -> None:
-    """Delete a LlamaStack vector store."""
+async def list_vector_stores() -> list[dict]:
+    """List all vector stores."""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(f"{_BASE}/v1/vector_stores")
+        resp.raise_for_status()
+        return resp.json().get("data", [])
+
+
+async def get_vector_store(vs_id: str) -> dict | None:
+    """Get a single vector store by ID. Returns None if not found."""
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.delete(f"{settings.llamastack_url}/v1/vector_stores/{vector_store_id}")
-        logger.info("Deleted vector store %s", vector_store_id)
-    except Exception as e:
-        logger.warning("Failed to delete vector store %s: %s", vector_store_id, e)
-
-
-async def _retrieve_context(vector_store_id: str, query: str) -> list[str]:
-    """Search vector store for relevant chunks."""
-    if not vector_store_id:
-        return []
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                f"{settings.llamastack_url}/v1/vector_stores/{vector_store_id}/search",
-                json={"query": query, "max_num_results": settings.top_k_results},
-            )
+            resp = await client.get(f"{_BASE}/v1/vector_stores/{vs_id}")
+            if resp.status_code == 404:
+                return None
             resp.raise_for_status()
-            data = resp.json()
+            return resp.json()
+    except Exception as e:
+        logger.warning("Failed to get vector store %s: %s", vs_id, e)
+        return None
 
-        chunks = []
-        for item in data.get("data", []):
-            for block in item.get("content", []):
-                if block.get("type") == "text":
-                    chunks.append(block["text"])
 
-        logger.info("Retrieved %d chunks from vector store %s", len(chunks), vector_store_id)
-        return chunks
-    except Exception:
-        logger.exception("Retrieval failed for vector store %s", vector_store_id)
+async def delete_vector_store(vs_id: str) -> None:
+    """Delete a vector store."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            await client.delete(f"{_BASE}/v1/vector_stores/{vs_id}")
+        logger.info("Deleted vector store %s", vs_id)
+    except Exception as e:
+        logger.warning("Failed to delete vector store %s: %s", vs_id, e)
+
+
+# ── Files ───────────────────────────────────────────────────────────────────
+
+async def upload_file(filename: str, content: bytes) -> dict:
+    """Upload a file to LlamaStack. Returns the file object."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(
+            f"{_BASE}/v1/files",
+            files={"file": (filename, content, "application/octet-stream")},
+            data={"purpose": "assistants"},
+        )
+        resp.raise_for_status()
+        f = resp.json()
+        logger.info("Uploaded file %s → id=%s", filename, f["id"])
+        return f
+
+
+async def list_files_in_vector_store(vs_id: str) -> list[dict]:
+    """List files attached to a vector store."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(f"{_BASE}/v1/vector_stores/{vs_id}/files")
+            resp.raise_for_status()
+            return resp.json().get("data", [])
+    except Exception as e:
+        logger.warning("Failed to list files for vs %s: %s", vs_id, e)
         return []
 
 
-async def chat_stream(vector_store_id: str, query: str, model: str, maas_token: str | None = None) -> AsyncIterator[str]:
-    """Retrieve context from LlamaStack, stream chat via MaaS gateway."""
-
-    context_chunks = await _retrieve_context(vector_store_id, query)
-
-    if context_chunks:
-        context_text = "\n\n---\n\n".join(context_chunks)
-        system_content = (
-            "You are a helpful research assistant. Answer the user's question "
-            "using ONLY the document context provided below. Cite specific passages. "
-            "If the context does not contain enough information, say so.\n\n"
-            f"DOCUMENT CONTEXT:\n{context_text}"
+async def attach_file_to_vector_store(vs_id: str, file_id: str) -> dict:
+    """Attach a file to a vector store (triggers chunking + embedding).
+    Uses a long timeout — large files need minutes to embed."""
+    async with httpx.AsyncClient(timeout=600.0) as client:
+        resp = await client.post(
+            f"{_BASE}/v1/vector_stores/{vs_id}/files",
+            json={"file_id": file_id, "chunking_strategy": {"type": "auto"}},
         )
-    else:
-        system_content = (
-            "You are a helpful research assistant. "
-            "No document context is available yet. "
-            "Answer from your general knowledge, or ask the user to upload documents first."
-        )
+        resp.raise_for_status()
+        result = resp.json()
+        logger.info("Attached file %s to vs %s (status=%s)",
+                     file_id, vs_id, result.get("status"))
+        return result
 
-    messages = [
-        {"role": "system", "content": system_content},
-        {"role": "user", "content": query},
-    ]
 
-    url = f"{settings.maas_base_url}/llm/{model}/v1/chat/completions"
-    # Use per-user token if provided, fall back to shared token
-    token = maas_token or settings.maas_token
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
-    logger.info("Chat: model=%s vs=%s", model, vector_store_id)
+# ── Responses API (RAG chat) ───────────────────────────────────────────────
+
+async def responses_stream(
+    query: str,
+    vector_store_ids: list[str],
+    model: str | None = None,
+    instructions: str | None = None,
+) -> AsyncIterator[str]:
+    """Stream a response from the LlamaStack Responses API with file_search.
+
+    Uses LlamaStack's built-in file_search tool which handles retrieval
+    from vector stores and feeds context to the model automatically.
+    Yields SSE-compatible JSON chunks (OpenAI streaming format).
+    """
+    model_id = model or settings.llamastack_model_id
+    system_instructions = instructions or (
+        "You are a helpful research assistant. Answer the user's question "
+        "using the document context retrieved via file search. "
+        "Cite specific passages when possible. "
+        "If the retrieved context does not contain enough information, say so."
+    )
+
+    payload = {
+        "model": model_id,
+        "input": query,
+        "instructions": system_instructions,
+        "stream": True,
+        "tools": [
+            {
+                "type": "file_search",
+                "vector_store_ids": vector_store_ids,
+                "max_num_results": settings.top_k_results,
+            }
+        ],
+    }
+
+    logger.info("Responses API: model=%s vs=%s", model_id, vector_store_ids)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         async with client.stream(
-            "POST", url, headers=headers,
-            json={"model": model, "messages": messages, "stream": True,
-                  "temperature": 0.3, "max_tokens": 2048},
+            "POST",
+            f"{_BASE}/v1/responses",
+            json=payload,
+            headers={"Content-Type": "application/json"},
         ) as stream:
             if stream.status_code >= 400:
                 body = await stream.aread()
-                logger.error("Gateway error %d: %s", stream.status_code, body)
-                yield f"{{\"error\": \"Gateway error {stream.status_code}\"}}"
+                logger.error("Responses API error %d: %s", stream.status_code, body)
+                yield f'{{"error": "LlamaStack error {stream.status_code}"}}'
                 return
             async for line in stream.aiter_lines():
                 if not line.startswith("data: "):
                     continue
-                payload = line[6:].strip()
-                if payload == "[DONE]":
+                payload_str = line[6:].strip()
+                if payload_str == "[DONE]":
                     return
-                yield payload
+                yield payload_str
+
+
+async def responses_sync(
+    query: str,
+    vector_store_ids: list[str],
+    model: str | None = None,
+    instructions: str | None = None,
+) -> dict:
+    """Non-streaming response for simple queries or fallback."""
+    model_id = model or settings.llamastack_model_id
+    system_instructions = instructions or (
+        "You are a helpful research assistant. Answer the user's question "
+        "using the document context retrieved via file search. "
+        "Cite specific passages when possible."
+    )
+
+    payload = {
+        "model": model_id,
+        "input": query,
+        "instructions": system_instructions,
+        "tools": [
+            {
+                "type": "file_search",
+                "vector_store_ids": vector_store_ids,
+                "max_num_results": settings.top_k_results,
+            }
+        ],
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(
+            f"{_BASE}/v1/responses",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        resp.raise_for_status()
+        return resp.json()

@@ -41,5 +41,8 @@ spec:
           memory: 500Mi
     distribution:
       name: rh-dev
+    storage:
+      size: {{ .Values.storage.size | default "5Gi" }}
+      mountPath: /opt/app-root/src/.llama/distributions/rh
     userConfig:
       configMapName: llama-stack-config

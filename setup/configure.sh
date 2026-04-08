@@ -401,8 +401,32 @@ fi
 step "Step 5f/7 — Creating llamastack-vllm-token secret in workspace namespaces"
 
 # LlamaStack uses this token to reach the MaaS gateway for model listing and inference.
-# Each workspace gets a token from the shared free-tier SA. Per-user tier enforcement
-# happens at the notebook-api level, not inside LlamaStack.
+# We use an enterprise-tier SA so LlamaStack (as an internal service) is not rate-limited.
+# Per-user rate limiting is handled by notebook-api at the application level.
+
+# Create enterprise tier namespace + SA if they don't exist
+ENTERPRISE_NS="maas-default-gateway-tier-enterprise"
+ENTERPRISE_SA="llamastack-internal"
+if ! oc get namespace "$ENTERPRISE_NS" &>/dev/null; then
+  oc create namespace "$ENTERPRISE_NS"
+  oc label namespace "$ENTERPRISE_NS" \
+    app.kubernetes.io/component=token-issuer \
+    app.kubernetes.io/part-of=maas-api \
+    maas.opendatahub.io/instance=maas-default-gateway \
+    maas.opendatahub.io/tier=enterprise \
+    maas.opendatahub.io/tier-namespace=true
+  success "Created enterprise tier namespace $ENTERPRISE_NS"
+fi
+if ! oc get sa "$ENTERPRISE_SA" -n "$ENTERPRISE_NS" &>/dev/null; then
+  oc create sa "$ENTERPRISE_SA" -n "$ENTERPRISE_NS"
+  oc label sa "$ENTERPRISE_SA" -n "$ENTERPRISE_NS" \
+    app.kubernetes.io/component=token-issuer \
+    app.kubernetes.io/part-of=maas-api \
+    maas.opendatahub.io/instance=maas-default-gateway \
+    maas.opendatahub.io/tier=enterprise
+  success "Created enterprise SA $ENTERPRISE_SA"
+fi
+
 for WKSP_NS in wksp-user1 wksp-user2 mydsproject; do
   if ! oc get namespace "$WKSP_NS" &>/dev/null; then
     warn "Namespace $WKSP_NS does not exist — skipping"
@@ -414,15 +438,20 @@ for WKSP_NS in wksp-user1 wksp-user2 mydsproject; do
     continue
   fi
 
-  VLLM_TOKEN=$(oc create token default     -n maas-default-gateway-tier-free     --audience=maas-default-gateway-sa     --duration=8760h 2>&1)
+  VLLM_TOKEN=$(oc create token "$ENTERPRISE_SA" \
+    -n "$ENTERPRISE_NS" \
+    --audience=maas-default-gateway-sa \
+    --duration=8760h 2>&1)
 
   if [ -z "$VLLM_TOKEN" ]; then
     warn "Failed to generate token for $WKSP_NS — skipping"
     continue
   fi
 
-  oc create secret generic llamastack-vllm-token     --from-literal=token="$VLLM_TOKEN"     -n "$WKSP_NS"
-  success "llamastack-vllm-token created in $WKSP_NS"
+  oc create secret generic llamastack-vllm-token \
+    --from-literal=token="$VLLM_TOKEN" \
+    -n "$WKSP_NS"
+  success "llamastack-vllm-token created in $WKSP_NS (enterprise tier)"
 done
 
 

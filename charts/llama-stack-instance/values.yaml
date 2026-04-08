@@ -8,3 +8,6 @@ deployer:
 model:
   name: qwen3-4b-instruct
   displayName: Qwen 3 4B Instruct 2507
+# Persistent storage for LlamaStack data (vector stores, files, metadata)
+storage:
+  size: 5Gi
