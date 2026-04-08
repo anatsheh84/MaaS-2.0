@@ -396,6 +396,36 @@ fi
 
 
 
+
+# ── Step 5f: Create LlamaStack vLLM token secret in each workspace namespace ───
+step "Step 5f/7 — Creating llamastack-vllm-token secret in workspace namespaces"
+
+# LlamaStack uses this token to reach the MaaS gateway for model listing and inference.
+# Each workspace gets a token from the shared free-tier SA. Per-user tier enforcement
+# happens at the notebook-api level, not inside LlamaStack.
+for WKSP_NS in wksp-user1 wksp-user2 mydsproject; do
+  if ! oc get namespace "$WKSP_NS" &>/dev/null; then
+    warn "Namespace $WKSP_NS does not exist — skipping"
+    continue
+  fi
+
+  if oc get secret llamastack-vllm-token -n "$WKSP_NS" &>/dev/null; then
+    warn "Secret llamastack-vllm-token already exists in $WKSP_NS — skipping"
+    continue
+  fi
+
+  VLLM_TOKEN=$(oc create token default     -n maas-default-gateway-tier-free     --audience=maas-default-gateway-sa     --duration=8760h 2>&1)
+
+  if [ -z "$VLLM_TOKEN" ]; then
+    warn "Failed to generate token for $WKSP_NS — skipping"
+    continue
+  fi
+
+  oc create secret generic llamastack-vllm-token     --from-literal=token="$VLLM_TOKEN"     -n "$WKSP_NS"
+  success "llamastack-vllm-token created in $WKSP_NS"
+done
+
+
 # ── Step 6: Deploy bootstrap Application ──────────────────────────────────────
 step "Step 6/7 — Deploying ArgoCD bootstrap Application"
 

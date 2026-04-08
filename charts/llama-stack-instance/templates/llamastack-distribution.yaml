@@ -24,7 +24,10 @@ spec:
       - name: VLLM_MAX_TOKENS
         value: "8192"
       - name: VLLM_API_TOKEN_1
-        value: fake
+        valueFrom:
+          secretKeyRef:
+            name: llamastack-vllm-token
+            key: token
       - name: LLAMA_STACK_CONFIG_DIR
         value: /opt/app-root/src/.llama/distributions/rh/
       name: llama-stack
