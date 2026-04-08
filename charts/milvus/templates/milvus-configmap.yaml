@@ -26,3 +26,24 @@ data:
 
     common:
       storageType: remote
+
+    proxy:
+      port: 19530
+
+    rootCoord:
+      port: 53100
+
+    dataCoord:
+      port: 13333
+
+    queryCoord:
+      port: 19531
+
+    dataNode:
+      port: 21124
+
+    queryNode:
+      port: 21123
+
+    indexNode:
+      port: 21121
