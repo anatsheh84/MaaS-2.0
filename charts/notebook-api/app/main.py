@@ -193,3 +193,111 @@ async def get_ingest_status(notebook_id: str):
         if k.startswith(f"{notebook_id}/")
     }
     return {"notebook_id": notebook_id, "jobs": statuses}
+
+
+# ── Tier token resolution ───────────────────────────────────────────────────
+# In-cluster paths auto-mounted by OpenShift
+_K8S_HOST = "https://kubernetes.default.svc"
+_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+_TIER_NAMESPACES = [
+    "maas-default-gateway-tier-free",
+    "maas-default-gateway-tier-premium",
+]
+_MAAS_AUDIENCE = "maas-default-gateway-sa"
+_TOKEN_TTL = 3600  # 1 hour
+
+
+async def _get_user_maas_token(username: str) -> dict | None:
+    """
+    Find the per-user tier SA (created by maas-api) and issue a short-lived
+    token for the MaaS gateway. Returns {token, tier, namespace} or None.
+
+    SA naming convention: {username}-{8char-hex-hash}
+    Label: app.kubernetes.io/component=token-issuer
+    """
+    import os, ssl
+    if not os.path.exists(_TOKEN_PATH):
+        logger.warning("Not running in-cluster — cannot resolve user token")
+        return None
+
+    with open(_TOKEN_PATH) as f:
+        sa_token = f.read().strip()
+
+    ctx = ssl.create_default_context(cafile=_CA_PATH)
+
+    # Search tier namespaces from highest to lowest (premium before free)
+    # so users get their highest entitled tier
+    for ns in reversed(_TIER_NAMESPACES):
+        try:
+            url = (
+                f"{_K8S_HOST}/api/v1/namespaces/{ns}/serviceaccounts"
+                f"?labelSelector=app.kubernetes.io%2Fcomponent%3Dtoken-issuer"
+                f"%2Cmaas.opendatahub.io%2Finstance%3Dmaas-default-gateway"
+            )
+            req = httpx.Request("GET", url, headers={"Authorization": f"Bearer {sa_token}"})
+            async with httpx.AsyncClient(verify=_CA_PATH, timeout=10.0) as client:
+                resp = await client.send(req)
+                resp.raise_for_status()
+                items = resp.json().get("items", [])
+
+            # Match SA whose name starts with {username}-
+            user_sa = next(
+                (sa for sa in items if sa["metadata"]["name"].startswith(f"{username}-")),
+                None,
+            )
+            if not user_sa:
+                continue
+
+            sa_name = user_sa["metadata"]["name"]
+            tier = user_sa["metadata"]["labels"].get("maas.opendatahub.io/tier", "unknown")
+
+            # Issue a short-lived token for this SA
+            token_url = (
+                f"{_K8S_HOST}/api/v1/namespaces/{ns}"
+                f"/serviceaccounts/{sa_name}/token"
+            )
+            body = {
+                "apiVersion": "authentication.k8s.io/v1",
+                "kind": "TokenRequest",
+                "spec": {
+                    "audiences": [_MAAS_AUDIENCE],
+                    "expirationSeconds": _TOKEN_TTL,
+                },
+            }
+            async with httpx.AsyncClient(verify=_CA_PATH, timeout=10.0) as client:
+                tresp = await client.post(
+                    token_url,
+                    json=body,
+                    headers={"Authorization": f"Bearer {sa_token}"},
+                )
+                tresp.raise_for_status()
+                token = tresp.json()["status"]["token"]
+                expires = tresp.json()["status"]["expirationTimestamp"]
+
+            logger.info("Issued MaaS token for %s (SA: %s, tier: %s)", username, sa_name, tier)
+            return {"token": token, "tier": tier, "namespace": ns, "expires": expires}
+
+        except Exception as e:
+            logger.debug("Tier namespace %s lookup failed for %s: %s", ns, username, e)
+            continue
+
+    logger.warning("No MaaS SA found for user %s in any tier namespace", username)
+    return None
+
+
+@app.get("/user-token/{username}")
+async def get_user_token(username: str):
+    """
+    Return a short-lived MaaS gateway token for the given user.
+    The token is scoped to the user's highest tier SA (created by maas-api).
+    Returns 404 if the user has no MaaS access granted.
+    """
+    result = await _get_user_maas_token(username)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No MaaS access found for user '{username}'. "
+                   f"Ensure the user has been onboarded via the MaaS portal.",
+        )
+    return result

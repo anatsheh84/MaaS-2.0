@@ -1,6 +1,4 @@
 # Dedicated ServiceAccount for notebook-api
-# Using a named SA (not default) follows least-privilege principles
-# and makes RBAC grants explicit and auditable
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -12,8 +10,6 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 ---
 # Role in the llm namespace — read-only access to LLMInferenceServices
-# This allows notebook-api to discover which models are deployed on the cluster
-# without requiring cluster-admin or any write permissions
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -28,7 +24,7 @@ rules:
   resources: ["llminferenceservices"]
   verbs: ["get", "list"]
 ---
-# RoleBinding — grants the notebook-api SA the model-reader role in llm namespace
+# RoleBinding for model discovery
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -46,3 +42,41 @@ subjects:
 - kind: ServiceAccount
   name: notebook-api
   namespace: {{ .Values.namespace }}
+{{- range .Values.tierNamespaces }}
+---
+# Role in {{ . }} — list SAs and create tokens for per-user MaaS gateway access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: notebook-api-token-requester
+  namespace: {{ . }}
+  labels:
+    app: notebook-api
+    app.kubernetes.io/part-of: notebook-api
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: notebook-api-token-requester
+  namespace: {{ . }}
+  labels:
+    app: notebook-api
+    app.kubernetes.io/part-of: notebook-api
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: notebook-api-token-requester
+subjects:
+- kind: ServiceAccount
+  name: notebook-api
+  namespace: {{ $.Values.namespace }}
+{{- end }}
