@@ -1,33 +1,22 @@
-# NotebookLM RAG API
-# ──────────────────
-# Override in values-llmaas.yaml for cluster deployment.
-
+# NotebookLM RAG API — LlamaStack-native architecture
 namespace: maas-rag
 
 image: image-registry.openshift-image-registry.svc:5000/maas-rag/notebook-api:latest
 replicas: 1
 
-# Upstream service URLs — defaults assume all services in maas-rag namespace
+llamastackUrl: "http://llamastack:8321"
+llamastackEmbeddingModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
 maasBaseUrl: "https://maas.apps.cluster.local"
-milvusUri: "http://milvus.maas-rag.svc:19530"
-embedEndpoint: "http://nomic-embed-predictor.maas-rag.svc/v1"
-embedModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
-doclingUrl: ""
+topKResults: "5"
+chunkSize: "512"
 
-# RAG tuning
-maxChunkSize: 512
-chunkOverlap: 50
-topKResults: 5
-scoreThreshold: "0.35"
-
-# Route
 deployer:
   domain: ""
 
 resources:
   requests:
-    cpu: "4"
-    memory: 10Gi
+    cpu: "250m"
+    memory: "256Mi"
   limits:
-    cpu: "4"
-    memory: 10Gi
+    cpu: "2"
+    memory: "2Gi"

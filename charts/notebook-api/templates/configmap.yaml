@@ -8,12 +8,8 @@ metadata:
     app.kubernetes.io/part-of: notebook-api
     app.kubernetes.io/managed-by: Helm
 data:
+  LLAMASTACK_URL: {{ .Values.llamastackUrl | quote }}
+  LLAMASTACK_EMBEDDING_MODEL: {{ .Values.llamastackEmbeddingModel | quote }}
   MAAS_BASE_URL: {{ .Values.maasBaseUrl | quote }}
-  MILVUS_URI: {{ .Values.milvusUri | quote }}
-  EMBED_ENDPOINT: {{ .Values.embedEndpoint | quote }}
-  EMBED_MODEL: {{ .Values.embedModel | quote }}
-  DOCLING_URL: {{ .Values.doclingUrl | quote }}
-  MAX_CHUNK_SIZE: {{ .Values.maxChunkSize | quote }}
-  CHUNK_OVERLAP: {{ .Values.chunkOverlap | quote }}
   TOP_K_RESULTS: {{ .Values.topKResults | quote }}
-  SCORE_THRESHOLD: {{ .Values.scoreThreshold | quote }}
+  CHUNK_SIZE: {{ .Values.chunkSize | quote }}
