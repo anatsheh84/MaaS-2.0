@@ -78,8 +78,7 @@ async def list_models():
                 )
                 resp.raise_for_status()
                 items = resp.json().get("items", [])
-            # The RAG model is the one configured in LlamaStack
-            rag_model = settings.llamastack_model_id.split("/")[-1]
+            # All LLM models are RAG-enabled (each has its own provider in LlamaStack)
             models = [
                 {
                     "value": item["metadata"]["name"],
@@ -88,7 +87,7 @@ async def list_models():
                         .get("openshift.io/display-name")
                         or item["metadata"]["name"].replace("-", " ").title()
                     ),
-                    "rag_enabled": item["metadata"]["name"] == rag_model,
+                    "rag_enabled": True,
                 }
                 for item in items
                 if item.get("status", {}).get("conditions", [{}])[0].get("status") != "False"
@@ -316,11 +315,8 @@ async def chat(
     username = _get_username(x_forwarded_user)
     logger.info("Chat: user=%s notebook=%s model=%s", username, notebook_id, body.model)
 
-    # LlamaStack only has one inference provider (maas-vllm-inference-1 → Qwen).
-    # Always use the configured default model for the Responses API.
-    # The model selector in the UI is informational — multi-model support requires
-    # registering additional providers in the LlamaStack ConfigMap.
-    model_id = None  # will use settings.llamastack_model_id default
+    # Map UI model name to LlamaStack model identifier (provider_id/model_id)
+    model_id = f"maas-{body.model}/{body.model}" if body.model else None
 
     async def stream_gen():
         """Use non-streaming Responses API (streaming has a LlamaStack v0.3.5 bug

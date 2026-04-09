@@ -27,13 +27,15 @@ data:
           url: http://snowflake-embed.llm.svc.cluster.local:8000/v1
           api_token: fake
           tls_verify: false
-      - provider_id: maas-vllm-inference-1
+      {{- range .Values.models }}
+      - provider_id: maas-{{ .name }}
         provider_type: remote::vllm
         config:
           api_token: ${env.VLLM_API_TOKEN_1:=fake}
           max_tokens: ${env.VLLM_MAX_TOKENS:=8192}
           tls_verify: ${env.VLLM_TLS_VERIFY:=true}
-          url: http://maas.{{ .Values.deployer.domain }}/llm/{{ .Values.model.name }}/v1
+          url: http://maas.{{ $.Values.deployer.domain }}/llm/{{ .name }}/v1
+      {{- end }}
       vector_io:
       - provider_id: milvus
         provider_type: inline::milvus
@@ -112,11 +114,13 @@ data:
         model_type: embedding
         metadata:
           embedding_dimension: 1024
-      - provider_id: maas-vllm-inference-1
-        model_id: {{ .Values.model.name }}
+      {{- range .Values.models }}
+      - provider_id: maas-{{ .name }}
+        model_id: {{ .name }}
         model_type: llm
         metadata:
-          display_name: {{ .Values.model.displayName }}
+          display_name: {{ .displayName }}
+      {{- end }}
       shields: []
       vector_dbs: []
       datasets: []

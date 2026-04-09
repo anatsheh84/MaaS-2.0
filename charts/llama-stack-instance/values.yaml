@@ -4,13 +4,21 @@
 # Cluster configuration, for templating routes
 deployer:
   domain: apps.cluster.example.com
-# Model configuration
-model:
-  name: qwen3-4b-instruct
-  displayName: Qwen 3 4B Instruct 2507
+
+# LLM models — each gets its own remote::vllm provider in LlamaStack.
+# All models are RAG-enabled (file_search uses the shared embedding service).
+models:
+  - name: qwen3-4b-instruct
+    displayName: Qwen3 4B Instruct 2507
+  - name: llama-3-1-8b-instruct-fp8
+    displayName: Llama 3.1 8B Instruct FP8
+  - name: mistral-small-24b-fp8
+    displayName: Mistral Small 3.1 24B Instruct FP8
+
 # Persistent storage for LlamaStack data (vector stores, files, metadata)
 storage:
   size: 5Gi
+
 # Pod resources — reduced since embeddings now run on shared GPU service
 resources:
   limits:
