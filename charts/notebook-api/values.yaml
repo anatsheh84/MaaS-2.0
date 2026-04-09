@@ -5,7 +5,7 @@ image: image-registry.openshift-image-registry.svc:5000/maas-rag/notebook-api:la
 replicas: 1
 
 llamastackUrl: "http://llamastack:8321"
-llamastackEmbeddingModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
+llamastackEmbeddingModel: "sentence-transformers/granite-embed"
 maasBaseUrl: "https://maas.apps.cluster.local"
 topKResults: "5"
 chunkSize: "512"
