@@ -204,6 +204,16 @@ export const App: React.FC = () => {
     } catch { setApiError('Failed to delete notebook.'); }
   };
 
+  const deleteDocument = async (docId: string, filename: string) => {
+    if (!notebookId) return;
+    if (!window.confirm(`Delete document "${filename}"? This cannot be undone.`)) return;
+    try {
+      const resp = await fetch(`${API_BASE}/notebooks/${notebookId}/documents/${docId}`, { method: 'DELETE' });
+      if (!resp.ok) { handleApiError(resp); return; }
+      setDocuments((prev) => prev.filter((d) => d.doc_id !== docId));
+    } catch { setApiError('Failed to delete document.'); }
+  };
+
   const createNotebook = async () => {
     if (!notebookName.trim()) return;
     setCreating(true); setApiError(null);
@@ -543,6 +553,16 @@ export const App: React.FC = () => {
                                         : status === 'failed' ? 'Failed'
                                         : status}
                                     </Label>
+                                  </FlexItem>
+                                  <FlexItem>
+                                    <Button
+                                      variant="plain"
+                                      icon={<TrashIcon />}
+                                      onClick={() => deleteDocument(doc.doc_id, doc.filename)}
+                                      aria-label={`Delete ${doc.filename}`}
+                                      style={{ color: '#c9190b', padding: 2 }}
+                                      isDisabled={isActive}
+                                    />
                                   </FlexItem>
                                 </Flex>
                               </div>

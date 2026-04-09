@@ -66,6 +66,14 @@ async def delete_vector_store(vs_id: str) -> None:
         logger.warning("Failed to delete vector store %s: %s", vs_id, e)
 
 
+async def delete_file_from_vector_store(vs_id: str, file_id: str) -> None:
+    """Remove a file from a vector store (deletes its embeddings)."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.delete(f"{_BASE}/v1/vector_stores/{vs_id}/files/{file_id}")
+        resp.raise_for_status()
+    logger.info("Deleted file %s from vector store %s", file_id, vs_id)
+
+
 # ── Files ───────────────────────────────────────────────────────────────────
 
 async def upload_file(filename: str, content: bytes) -> dict:

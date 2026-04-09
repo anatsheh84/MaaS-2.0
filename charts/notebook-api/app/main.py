@@ -252,6 +252,18 @@ async def list_documents(notebook_id: str):
     return {"documents": docs}
 
 
+@app.delete("/notebooks/{notebook_id}/documents/{file_id}", status_code=204)
+async def delete_document(notebook_id: str, file_id: str):
+    """Remove a document from a notebook (deletes its embeddings from the vector store)."""
+    vs = await llamastack_client.get_vector_store(notebook_id)
+    if not vs:
+        raise HTTPException(404, "Notebook not found")
+    try:
+        await llamastack_client.delete_file_from_vector_store(notebook_id, file_id)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to delete document: {e}")
+
+
 @app.get("/notebooks/{notebook_id}/ingest-status")
 async def get_ingest_status(notebook_id: str):
     """Get ingest status from the vector store file_counts."""
