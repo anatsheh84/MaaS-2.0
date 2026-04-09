@@ -342,16 +342,22 @@ async def chat(
                 compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {error_msg}"}}]}
                 yield f"data: {_json.dumps(compat)}\n\n"
             else:
-                # Extract text from the response output and simulate streaming
-                # by sending words in small batches
+                # Extract text and citations from the response output
                 import asyncio as _asyncio
+                citations = []
                 for output in result.get("output", []):
                     if output.get("type") == "message":
                         for content in output.get("content", []):
                             if content.get("type") == "output_text":
                                 text = content.get("text", "")
+                                # Collect unique citations
+                                for ann in content.get("annotations", []):
+                                    if ann.get("type") == "file_citation":
+                                        fn = ann.get("filename", "")
+                                        if fn and fn not in [c["filename"] for c in citations]:
+                                            citations.append({"file_id": ann.get("file_id", ""), "filename": fn})
                                 if text:
-                                    # Split into ~3-word chunks for natural streaming feel
+                                    # Simulate streaming in ~3-word chunks
                                     words = text.split(" ")
                                     chunk = []
                                     for w in words:
@@ -366,6 +372,9 @@ async def chat(
                                         piece = " ".join(chunk)
                                         compat = {"choices": [{"index": 0, "delta": {"content": piece}}]}
                                         yield f"data: {_json.dumps(compat)}\n\n"
+                # Send citations as a separate event after the text
+                if citations:
+                    yield f"data: {_json.dumps({'citations': citations})}\n\n"
         except Exception as e:
             logger.exception("Chat error for notebook %s", notebook_id)
             compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {e}"}}]}

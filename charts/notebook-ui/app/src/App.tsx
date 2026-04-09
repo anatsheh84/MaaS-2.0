@@ -39,7 +39,7 @@ import {
 const API_BASE = window.location.hostname === 'localhost' ? '' : '/api';
 
 interface ModelOption { value: string; label: string; rag_enabled?: boolean }
-interface ChatMessage { role: 'user' | 'assistant'; content: string }
+interface ChatMessage { role: 'user' | 'assistant'; content: string; citations?: { file_id: string; filename: string }[] }
 interface IngestJob { status: string; progress?: number; filename?: string; error?: string }
 interface DocEntry { doc_id: string; filename: string; ingest_status: string }
 interface NotebookEntry {
@@ -347,6 +347,16 @@ export const App: React.FC = () => {
           if (payload === '[DONE]') continue;
           try {
             const parsed = JSON.parse(payload);
+            // Handle citations event
+            if (parsed?.citations) {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const msg = updated[assistantIdx];
+                updated[assistantIdx] = { ...msg, citations: parsed.citations };
+                return updated;
+              });
+              continue;
+            }
             let token = '';
             if (parsed?.choices?.[0]?.delta?.content) {
               token = parsed.choices[0].delta.content;
@@ -683,6 +693,14 @@ export const App: React.FC = () => {
                         {msg.content || (streaming && i === messages.length - 1 ? (
                           <Spinner size="sm" />
                         ) : null)}
+                        {msg.citations && msg.citations.length > 0 && (
+                          <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #ddd', display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                            <span style={{ fontSize: 11, color: '#6a6e73' }}>Sources: </span>
+                            {msg.citations.map((c, ci) => (
+                              <span key={ci} style={{ fontSize: 11, background: '#e7f1fa', color: '#06c', padding: '1px 6px', borderRadius: 4 }}>{c.filename}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))
