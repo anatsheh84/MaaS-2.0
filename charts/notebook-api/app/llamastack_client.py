@@ -215,3 +215,48 @@ async def responses_sync(
         )
         resp.raise_for_status()
         return resp.json()
+
+
+
+async def list_responses(vector_store_id: str) -> list[dict]:
+    """Fetch conversation history from LlamaStack, filtered by vector store ID.
+    Returns a list of {query, answer, created_at, model} dicts, newest first."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(f"{_BASE}/v1/responses")
+        resp.raise_for_status()
+        data = resp.json()
+
+    results = []
+    for r in data.get("data", []):
+        # Filter by vector_store_id
+        vs_ids = []
+        for t in r.get("tools", []):
+            vs_ids.extend(t.get("vector_store_ids", []))
+        if vector_store_id not in vs_ids:
+            continue
+
+        # Extract query from input
+        query = ""
+        for inp in r.get("input", []):
+            for c in inp.get("content", []):
+                if c.get("type") == "input_text":
+                    query = c["text"]
+
+        # Extract answer from output
+        answer = ""
+        for o in r.get("output", []):
+            if o.get("type") == "message":
+                for c in o.get("content", []):
+                    if c.get("type") == "output_text":
+                        answer = c["text"]
+
+        if query or answer:
+            results.append({
+                "id": r.get("id", ""),
+                "query": query,
+                "answer": answer,
+                "created_at": r.get("created_at", 0),
+                "model": r.get("model", ""),
+            })
+
+    return results

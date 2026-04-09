@@ -287,6 +287,16 @@ async def get_ingest_status(notebook_id: str):
 
 # ── Chat (via LlamaStack Responses API) ─────────────────────────────────────
 
+@app.get("/notebooks/{notebook_id}/history")
+async def get_history(notebook_id: str):
+    """Get conversation history for a notebook."""
+    vs = await llamastack_client.get_vector_store(notebook_id)
+    if not vs:
+        raise HTTPException(404, "Notebook not found")
+    history = await llamastack_client.list_responses(notebook_id)
+    return {"history": history}
+
+
 @app.post("/notebooks/{notebook_id}/chat")
 async def chat(
     notebook_id: str,

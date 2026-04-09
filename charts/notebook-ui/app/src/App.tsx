@@ -184,6 +184,22 @@ export const App: React.FC = () => {
     setActiveNotebookName(nb.name);
     setMessages([]); setIngestJobs({});
     await refreshDocuments(nb.notebook_id);
+
+    // Load conversation history
+    try {
+      const histResp = await fetch(`${API_BASE}/notebooks/${nb.notebook_id}/history`);
+      if (histResp.ok) {
+        const histData = await histResp.json();
+        const hist: ChatMessage[] = [];
+        // Responses come newest-first; reverse for chronological display
+        const entries = (histData.history || []).reverse();
+        for (const entry of entries) {
+          if (entry.query) hist.push({ role: 'user', content: entry.query });
+          if (entry.answer) hist.push({ role: 'assistant', content: entry.answer });
+        }
+        if (hist.length > 0) setMessages(hist);
+      }
+    } catch { /* history is optional — don't block notebook selection */ }
   };
 
   const deleteNotebook = async (nb: NotebookEntry, e: React.MouseEvent) => {
