@@ -1,6 +1,6 @@
 namespace: maas-rag
 llamastackUrl: "http://lsd-genai-playground-service.wksp-user1.svc.cluster.local:8321"
-llamastackEmbeddingModel: "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"
+llamastackEmbeddingModel: "sentence-transformers/granite-embed"
 maasBaseUrl: "https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com"
 topKResults: "5"
 chunkSize: "512"
