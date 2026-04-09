@@ -346,16 +346,30 @@ async def chat(
                 compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {error_msg}"}}]}
                 yield f"data: {_json.dumps(compat)}\n\n"
             else:
-                # Extract text from the response output
+                # Extract text from the response output and simulate streaming
+                # by sending words in small batches
+                import asyncio as _asyncio
                 for output in result.get("output", []):
                     if output.get("type") == "message":
                         for content in output.get("content", []):
                             if content.get("type") == "output_text":
                                 text = content.get("text", "")
-                                # Send as a single chunk (non-streaming)
                                 if text:
-                                    compat = {"choices": [{"index": 0, "delta": {"content": text}}]}
-                                    yield f"data: {_json.dumps(compat)}\n\n"
+                                    # Split into ~3-word chunks for natural streaming feel
+                                    words = text.split(" ")
+                                    chunk = []
+                                    for w in words:
+                                        chunk.append(w)
+                                        if len(chunk) >= 3:
+                                            piece = " ".join(chunk) + " "
+                                            compat = {"choices": [{"index": 0, "delta": {"content": piece}}]}
+                                            yield f"data: {_json.dumps(compat)}\n\n"
+                                            await _asyncio.sleep(0.02)
+                                            chunk = []
+                                    if chunk:
+                                        piece = " ".join(chunk)
+                                        compat = {"choices": [{"index": 0, "delta": {"content": piece}}]}
+                                        yield f"data: {_json.dumps(compat)}\n\n"
         except Exception as e:
             logger.exception("Chat error for notebook %s", notebook_id)
             compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {e}"}}]}
