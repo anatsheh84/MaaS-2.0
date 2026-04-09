@@ -22,8 +22,11 @@ data:
     providers:
       inference:
       - provider_id: sentence-transformers
-        provider_type: inline::sentence-transformers
-        config: {}
+        provider_type: remote::vllm
+        config:
+          url: https://nomic-embed-kserve-workload-svc.llm.svc.cluster.local:8000/v1
+          api_token: fake
+          tls_verify: false
       - provider_id: maas-vllm-inference-1
         provider_type: remote::vllm
         config:
@@ -104,8 +107,8 @@ data:
     registered_resources:
       models:
       - provider_id: sentence-transformers
-        model_id: sentence-transformers/ibm-granite/granite-embedding-125m-english
-        provider_model_id: ibm-granite/granite-embedding-125m-english
+        model_id: sentence-transformers/nomic-embed
+        provider_model_id: nomic-embed
         model_type: embedding
         metadata:
           embedding_dimension: 768

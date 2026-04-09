@@ -1,8 +1,9 @@
-# Embedding model for NotebookLM RAG
-# ────────────────────────────────────
-# Runs on CPU — no GPU, no HardwareProfile.
+# Shared GPU embedding model for all LlamaStack instances
+# ────────────────────────────────────────────────────────
+# Runs on GPU via vLLM — serves /v1/embeddings endpoint.
+# All LlamaStack pods point to this service via remote::vllm.
 
-namespace: maas-rag
+namespace: llm
 
 image: registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.5
 
@@ -15,9 +16,12 @@ models:
       requests:
         cpu: "2"
         memory: 8Gi
+        nvidia.com/gpu: "1"
       limits:
         cpu: "4"
         memory: 16Gi
+        nvidia.com/gpu: "1"
     extraArgs:
       - --task=embed
       - --max-model-len=8192
+      - --gpu-memory-utilization=0.5

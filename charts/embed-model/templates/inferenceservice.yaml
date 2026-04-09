@@ -1,8 +1,7 @@
 {{- range .Values.models }}
 ---
-# Embedding model served via LLMInferenceService (same CRD as LLM models).
-# CPU-only: no HardwareProfile, no nodeSelector, no GPU tolerations.
-# Exposed as an internal ClusterIP service only — not behind the MaaS gateway.
+# Shared GPU embedding model served via vLLM.
+# All LlamaStack instances point to this service via remote::vllm provider.
 apiVersion: serving.kserve.io/v1alpha1
 kind: LLMInferenceService
 metadata:
@@ -10,6 +9,8 @@ metadata:
   namespace: {{ $.Values.namespace }}
   annotations:
     openshift.io/display-name: {{ .displayName }}
+    opendatahub.io/hardware-profile-name: nvidia-l40s-single-gpu
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
   labels:
     opendatahub.io/dashboard: "true"
     opendatahub.io/genai-asset: "true"
@@ -29,7 +30,12 @@ spec:
       args:
       - "--served-model-name={{ .name }}"
       - --model=/mnt/models
-      {{- toYaml .extraArgs | nindent 6 }}
+      - --enable-ssl-refresh
+      - --ssl-certfile=/var/run/kserve/tls/tls.crt
+      - --ssl-keyfile=/var/run/kserve/tls/tls.key
+      {{- range .extraArgs }}
+      - {{ . | quote }}
+      {{- end }}
       ports:
       - containerPort: 8000
         name: http
@@ -49,6 +55,13 @@ spec:
       volumeMounts:
       - mountPath: /dev/shm
         name: shm
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    tolerations:
+    - effect: NoSchedule
+      key: nvidia.com/gpu
+      operator: Equal
+      value: l40-gpu
     volumes:
     - emptyDir:
         medium: Memory
