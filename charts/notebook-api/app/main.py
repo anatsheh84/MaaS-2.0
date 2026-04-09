@@ -357,6 +357,9 @@ async def chat(
                                         if fn and fn not in [c["filename"] for c in citations]:
                                             citations.append({"file_id": ann.get("file_id", ""), "filename": fn})
                                 if text:
+                                    # Strip LlamaStack internal RAG prompt leakage
+                                    import re
+                                    text = re.split(r'Cite sources?:', text, maxsplit=1)[0].rstrip()
                                     # Simulate streaming in ~3-word chunks
                                     words = text.split(" ")
                                     chunk = []
