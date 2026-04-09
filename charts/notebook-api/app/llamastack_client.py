@@ -114,7 +114,7 @@ async def attach_file_to_vector_store(vs_id: str, file_id: str) -> dict:
     512-token context limit. Long timeout for large files."""
     chunking = {
         "type": "static",
-        "static": {"max_chunk_size_tokens": 400, "chunk_overlap_tokens": 50},
+        "static": {"max_chunk_size_tokens": 300, "chunk_overlap_tokens": 40},
     }
     async with httpx.AsyncClient(timeout=600.0) as client:
         resp = await client.post(

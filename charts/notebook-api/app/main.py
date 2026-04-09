@@ -215,7 +215,7 @@ async def upload_document(
                     f"{llamastack_client.settings.llamastack_url}/v1/vector_stores/{notebook_id}/files",
                     json={"file_id": file_id, "chunking_strategy": {
                         "type": "static",
-                        "static": {"max_chunk_size_tokens": 400, "chunk_overlap_tokens": 50},
+                        "static": {"max_chunk_size_tokens": 300, "chunk_overlap_tokens": 40},
                     }},
                 )
                 resp.raise_for_status()
