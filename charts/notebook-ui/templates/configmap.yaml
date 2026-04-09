@@ -9,6 +9,8 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 data:
   api-proxy.conf: |
+    client_max_body_size 50m;
+
     location /api/ {
         proxy_pass {{ .Values.notebookApiUrl }}/;
         proxy_http_version 1.1;

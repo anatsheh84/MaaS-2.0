@@ -8,6 +8,8 @@ metadata:
     app: notebook-ui
     app.kubernetes.io/part-of: notebook-ui
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    haproxy.router.openshift.io/proxy-body-size: "50m"
 spec:
   host: notebook.{{ .Values.deployer.domain }}
   port:
