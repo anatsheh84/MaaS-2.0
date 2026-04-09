@@ -186,6 +186,24 @@ export const App: React.FC = () => {
     await refreshDocuments(nb.notebook_id);
   };
 
+  const deleteNotebook = async (nb: NotebookEntry, e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't trigger selectNotebook
+    if (!window.confirm(`Delete notebook "${nb.name}" and all its documents? This cannot be undone.`)) return;
+    try {
+      const resp = await fetch(`${API_BASE}/notebooks/${nb.notebook_id}`, { method: 'DELETE' });
+      if (!resp.ok) { handleApiError(resp); return; }
+      // If we're viewing the deleted notebook, go back to list
+      if (notebookId === nb.notebook_id) {
+        setNotebookId(null);
+        setActiveNotebookName(null);
+        setDocuments([]);
+        setMessages([]);
+      }
+      // Refresh the notebook list
+      setExistingNotebooks((prev) => prev.filter((n) => n.notebook_id !== nb.notebook_id));
+    } catch { setApiError('Failed to delete notebook.'); }
+  };
+
   const createNotebook = async () => {
     if (!notebookName.trim()) return;
     setCreating(true); setApiError(null);
@@ -413,20 +431,32 @@ export const App: React.FC = () => {
                                 cursor: 'pointer',
                                 background: '#fafafa',
                                 transition: 'background 0.15s',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
                               }}
                               onMouseEnter={(e) => (e.currentTarget.style.background = '#e7f1fa')}
                               onMouseLeave={(e) => (e.currentTarget.style.background = '#fafafa')}
                             >
-                              <div style={{ fontWeight: 600, fontSize: 14 }}>
-                                <BookOpenIcon style={{ marginRight: 6 }} />
-                                {nb.name}
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: 14 }}>
+                                  <BookOpenIcon style={{ marginRight: 6 }} />
+                                  {nb.name}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#6a6e73', marginTop: 2 }}>
+                                  {nb.file_counts?.total || 0} document{(nb.file_counts?.total || 0) !== 1 ? 's' : ''}
+                                  {nb.status === 'completed' && (
+                                    <Label color="green" style={{ marginLeft: 8 }} isCompact>ready</Label>
+                                  )}
+                                </div>
                               </div>
-                              <div style={{ fontSize: 12, color: '#6a6e73', marginTop: 2 }}>
-                                {nb.file_counts?.total || 0} document{(nb.file_counts?.total || 0) !== 1 ? 's' : ''}
-                                {nb.status === 'completed' && (
-                                  <Label color="green" style={{ marginLeft: 8 }} isCompact>ready</Label>
-                                )}
-                              </div>
+                              <Button
+                                variant="plain"
+                                icon={<TrashIcon />}
+                                onClick={(e) => deleteNotebook(nb, e)}
+                                aria-label={`Delete notebook ${nb.name}`}
+                                style={{ color: '#c9190b', padding: 4 }}
+                              />
                             </div>
                           ))}
                         </div>
