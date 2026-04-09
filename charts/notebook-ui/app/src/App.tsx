@@ -195,7 +195,7 @@ export const App: React.FC = () => {
       // If we're viewing the deleted notebook, go back to list
       if (notebookId === nb.notebook_id) {
         setNotebookId(null);
-        setActiveNotebookName(null);
+        setActiveNotebookName('');
         setDocuments([]);
         setMessages([]);
       }
