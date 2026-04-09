@@ -213,7 +213,10 @@ async def upload_document(
             with sync_httpx.Client(timeout=600.0) as client:
                 resp = client.post(
                     f"{llamastack_client.settings.llamastack_url}/v1/vector_stores/{notebook_id}/files",
-                    json={"file_id": file_id, "chunking_strategy": {"type": "auto"}},
+                    json={"file_id": file_id, "chunking_strategy": {
+                        "type": "static",
+                        "static": {"max_chunk_size_tokens": 400, "chunk_overlap_tokens": 50},
+                    }},
                 )
                 resp.raise_for_status()
                 result = resp.json()
