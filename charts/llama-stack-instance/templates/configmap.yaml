@@ -24,7 +24,7 @@ data:
       - provider_id: sentence-transformers
         provider_type: remote::vllm
         config:
-          url: http://granite-embed.llm.svc.cluster.local:8000/v1
+          url: https://snowflake-embed-kserve-workload-svc.llm.svc.cluster.local:8000/v1
           api_token: fake
           tls_verify: false
       - provider_id: maas-vllm-inference-1
@@ -107,11 +107,11 @@ data:
     registered_resources:
       models:
       - provider_id: sentence-transformers
-        model_id: sentence-transformers/granite-embed
-        provider_model_id: granite-embed
+        model_id: sentence-transformers/snowflake-embed
+        provider_model_id: snowflake-embed
         model_type: embedding
         metadata:
-          embedding_dimension: 768
+          embedding_dimension: 1024
       - provider_id: maas-vllm-inference-1
         model_id: {{ .Values.model.name }}
         model_type: llm

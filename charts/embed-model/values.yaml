@@ -1,16 +1,16 @@
 # Shared GPU embedding model for all LlamaStack instances
 # ────────────────────────────────────────────────────────
 # Runs on GPU via vLLM — serves /v1/embeddings endpoint.
-# Downloads model from HuggingFace at startup (no modelcar needed).
+# Snowflake Arctic Embed L v2.0: 8192 context, 1024 dim, multilingual
 
 namespace: llm
 
 image: registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.5
 
 models:
-  - name: granite-embed
-    displayName: Granite Embedding 125M English
-    hfModel: ibm-granite/granite-embedding-125m-english
+  - name: snowflake-embed
+    displayName: Snowflake Arctic Embed L v2.0
+    uri: oci://quay.io/anatsheh84/modelcar-snowflake-arctic-embed-l-v2.0:1.5
     replicas: 1
     resources:
       requests:
@@ -23,6 +23,5 @@ models:
         nvidia.com/gpu: "1"
     extraArgs:
       - --task=embed
-      - --max-model-len=512
+      - --max-model-len=8192
       - --gpu-memory-utilization=0.3
-      - --override-pooler-config={"pooling_type":"CLS","normalize":true}

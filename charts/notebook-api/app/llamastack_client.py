@@ -112,10 +112,7 @@ async def attach_file_to_vector_store(vs_id: str, file_id: str) -> dict:
     """Attach a file to a vector store (triggers chunking + embedding).
     Uses static chunking (400 tokens max) to stay within the embedding model's
     512-token context limit. Long timeout for large files."""
-    chunking = {
-        "type": "static",
-        "static": {"max_chunk_size_tokens": 300, "chunk_overlap_tokens": 40},
-    }
+    chunking = {"type": "auto"}
     async with httpx.AsyncClient(timeout=600.0) as client:
         resp = await client.post(
             f"{_BASE}/v1/vector_stores/{vs_id}/files",
