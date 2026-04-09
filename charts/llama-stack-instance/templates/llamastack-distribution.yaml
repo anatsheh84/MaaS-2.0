@@ -34,11 +34,11 @@ spec:
       port: 8321
       resources:
         limits:
-          cpu: "2"
-          memory: 12Gi
+          cpu: {{ .Values.resources.limits.cpu | default "8" | quote }}
+          memory: {{ .Values.resources.limits.memory | default "16Gi" }}
         requests:
-          cpu: 250m
-          memory: 500Mi
+          cpu: {{ .Values.resources.requests.cpu | default "2" | quote }}
+          memory: {{ .Values.resources.requests.memory | default "2Gi" }}
     distribution:
       name: rh-dev
     storage:

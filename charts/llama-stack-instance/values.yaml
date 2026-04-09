@@ -11,3 +11,11 @@ model:
 # Persistent storage for LlamaStack data (vector stores, files, metadata)
 storage:
   size: 5Gi
+# Pod resources — higher CPU speeds up embedding (sentence-transformers runs on CPU)
+resources:
+  limits:
+    cpu: "8"
+    memory: 16Gi
+  requests:
+    cpu: "2"
+    memory: 2Gi
