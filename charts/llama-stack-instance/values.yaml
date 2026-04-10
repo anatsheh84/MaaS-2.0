@@ -14,6 +14,8 @@ models:
     displayName: Llama 3.1 8B Instruct FP8
   - name: mistral-small-24b-fp8
     displayName: Mistral Small 3.1 24B Instruct FP8
+  - name: phi-4-instruct-w8a8
+    displayName: Phi-4 Instruct W8A8
 
 # Persistent storage for LlamaStack data (vector stores, files, metadata)
 storage:
