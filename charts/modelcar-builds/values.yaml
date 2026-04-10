@@ -2,7 +2,7 @@
 # Each build downloads from HuggingFace and creates an OCI modelcar image
 builds:
   - name: granite-modelcar
-    huggingfaceId: ibm-granite/granite-4.0-h-tiny-FP8
+    huggingfaceId: ibm-granite/granite-4.0-h-tiny
     resources:
       limits:
         cpu: "4"
