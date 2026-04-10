@@ -34,7 +34,11 @@ data:
           api_token: ${env.VLLM_API_TOKEN_1:=fake}
           max_tokens: ${env.VLLM_MAX_TOKENS:=8192}
           tls_verify: ${env.VLLM_TLS_VERIFY:=true}
+          {{- if .url }}
+          url: {{ .url }}
+          {{- else }}
           url: http://maas.{{ $.Values.deployer.domain }}/llm/{{ .name }}/v1
+          {{- end }}
       {{- end }}
       vector_io:
       - provider_id: milvus
