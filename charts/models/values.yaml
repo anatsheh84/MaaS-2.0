@@ -99,27 +99,3 @@ models:
         key: nvidia.com/gpu
         operator: Equal
         value: l40-gpu
-
-  - name: granite-4-0-h-tiny-fp8
-    displayName: Granite 4.0-H Tiny FP8
-    uri: oci://image-registry.openshift-image-registry.svc:5000/llm/granite-modelcar:latest
-    hardwareProfile: nvidia-l40s-single-gpu
-    resources:
-      limits:
-        cpu: "6"
-        memory: 24Gi
-        nvidia.com/gpu: "1"
-      requests:
-        cpu: "4"
-        memory: 16Gi
-        nvidia.com/gpu: "1"
-    extraArgs:
-      - --enable-auto-tool-choice
-      - --tool-call-parser=hermes
-      - --gpu-memory-utilization=0.95
-      - --max-model-len=32768
-    tolerations:
-      - effect: NoSchedule
-        key: nvidia.com/gpu
-        operator: Equal
-        value: l40-gpu
