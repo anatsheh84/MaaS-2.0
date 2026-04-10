@@ -16,9 +16,8 @@ models:
     displayName: Mistral Small 3.1 24B Instruct FP8
   - name: phi-4-instruct-w8a8
     displayName: Phi-4 Instruct W8A8
-  - name: granite-4-0-h-small-fp8
-    displayName: Granite 4.0-H Small FP8
-    url: http://granite-4-0-h-small-fp8.llm.svc.cluster.local:8000/v1
+  - name: granite-4-0-h-tiny-fp8
+    displayName: Granite 4.0-H Tiny FP8
     maxTokens: 4096
 
 # Persistent storage for LlamaStack data (vector stores, files, metadata)

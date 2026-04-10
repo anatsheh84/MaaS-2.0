@@ -1,0 +1,4 @@
+apiVersion: v2
+name: modelcar-builds
+description: BuildConfigs for custom modelcar images (models without Red Hat modelcar images)
+version: 0.1.0

@@ -13,3 +13,5 @@ bootstrap/values.local.yaml
 
 # Dashboard source files — already promoted to charts/grafana/templates/
 Dashboards/
+charts/notebook-ui/app/dist/
+charts/notebook-ui/app/node_modules/

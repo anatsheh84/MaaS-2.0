@@ -1,4 +1,0 @@
-apiVersion: v2
-name: granite-model
-description: Granite 4.0-H-Small-FP8 LLM via vLLM (HuggingFace download)
-version: 0.1.0

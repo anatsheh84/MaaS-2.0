@@ -1,245 +1,145 @@
-# MaaS 2.0 — Handover Document
-**Date:** 2026-04-08  
-**Cluster:** `https://api.cluster-ttpwl.ttpwl.sandbox962.opentlc.com:6443`  
-**Repo:** `https://github.com/anatsheh84/MaaS-2.0` | Local: `/Users/aelnatsh/Lab/MaaS`  
-**Latest commit:** `f138e41`  
-**Apps domain:** `apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com`
+# MaaS 2.0 — Handover Prompt for New Chat Session
+
+## Context
+
+All actions can be done using Desktop Commander and the OpenShift `oc` command is installed and can be used after authentication.
+
+You are continuing work on **MaaS 2.0** — a fully GitOps-driven Models-as-a-Service platform on OpenShift AI (RHOAI). The platform includes a **NotebookLM-style RAG application** built as a thin UI wrapper over LlamaStack. The key design principle is: **the notebook application is a thin wrapper — OpenShift AI with LlamaStack is the engine/core**. Do NOT add custom logic to the notebook-api; rely on LlamaStack's native APIs.
+
+**Repo:** `github.com/anatsheh84/MaaS-2.0` | **Local clone:** `/Users/aelnatsh/Lab/MaaS`
+**Cluster:** RHPDS sandbox cluster (use `--insecure-skip-tls-verify=true` for `oc login`)
 
 ---
 
-## Cluster Credentials
-
-```bash
-oc login https://api.cluster-ttpwl.ttpwl.sandbox962.opentlc.com:6443 \
-  --username=admin --password=<admin-password>
-```
-
-Users: `user1` / `user2` / `admin` / `kube:admin`  
-Identity provider: `htpasswd-maas`
-
----
-
-## Platform Overview
-
-GitOps-driven MaaS 2.0 platform on OpenShift AI. All components managed by ArgoCD
-(`openshift-gitops`). Bootstrap app at `setup/bootstrap.yaml`.
-
-**Active models** (namespace: `llm`, g6e.12xlarge, 4× NVIDIA L40S):
-- `qwen3-4b-instruct`
-- `llama-3-1-8b-instruct-fp8`
-- `mistral-small-24b-fp8`
-- `phi-4-instruct-w8a8`
-
-**MaaS gateway:** `https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com`  
-**Gateway auth:** Kuadrant `kubernetesTokenReview`, audience `maas-default-gateway-sa`
-
-**Tier rate limits** (Kuadrant `RateLimitPolicy`, counter per `auth.identity.userid`):
-- `free` → 5 req / 2 min
-- `premium` → 20 req / 2 min
-- `enterprise` → no limit
-
-**Tier SA namespaces:**
-- `maas-default-gateway-tier-free` → `kube-admin-81378af5`
-- `maas-default-gateway-tier-premium` → `user1-b3daa77b`
-- user2 has NO tier SA yet (falls back to shared free token — see Pending Items)
-
----
-
-## RAG Notebook App (namespace: `maas-rag`)
-
-**UI:** `https://notebook.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com`  
-**Auth:** OpenShift OAuth via `oauth-proxy` sidecar (2/2 containers in notebook-ui pod)  
-**notebook-api:** Internal only — no public Route. Reachable via nginx proxy at `/api/`
-
-### Architecture
+## Architecture
 
 ```
-Browser → oauth-proxy:4180 (OpenShift login redirect)
-               ↓ X-Forwarded-User: username
-          nginx:8080 (serves React UI, proxies /api/ to notebook-api)
-               ↓
-          notebook-api:8000 (FastAPI)
-               ↓ K8s API: find user's tier SA → TokenRequest
-          MaaS gateway (per-user token, tier-enforced)
-               ↓
-          LlamaStack (wksp-user1) → vLLM inference
-          Milvus (vector store, gp3-csi PVCs)
+User Browser → notebook-ui (React, PatternFly, nginx) → notebook-api (FastAPI)
+                                                              ↓
+                                                        LlamaStack v0.3.5.1 (rh-dev)
+                                                         ├── Responses API (file_search + RAG)
+                                                         ├── Files API (upload)
+                                                         ├── Vector Stores API (notebooks)
+                                                         └── remote::vllm providers
+                                                              ├── maas-qwen3-4b-instruct → MaaS Gateway → Qwen vLLM
+                                                              ├── maas-llama-3-1-8b-instruct-fp8 → MaaS Gateway → Llama vLLM
+                                                              ├── maas-mistral-small-24b-fp8 → MaaS Gateway → Mistral vLLM
+                                                              └── sentence-transformers → Snowflake Embed Service (GPU)
 ```
 
-### Key Components
+**Per-user isolation:** Each user gets their own LlamaStack pod + PVC (`wksp-user1`, `wksp-user2`). All data (sql_store.db, kvstore.db, milvus.db, raw files) is per-user on the PVC. The only shared component is the Snowflake embedding service (stateless, GPU, in `llm` namespace).
 
-| Resource | Namespace | Notes |
-|---|---|---|
-| `notebook-api` Deployment | `maas-rag` | SA: `notebook-api`, FastAPI |
-| `notebook-ui` Deployment | `maas-rag` | 2 containers: oauth-proxy + nginx |
-| `milvus` Deployment | `maas-rag` | Vector store, gp3-csi PVCs |
-| `notebook-ui-proxy` Secret | `maas-rag` | oauth-proxy cookie secret |
-| `maas-gateway-token` Secret | `maas-rag` | Shared fallback free-tier token |
-| `notebook-api` SA | `maas-rag` | RBAC: list LLMInferenceServices in `llm`; list/token SAs in tier namespaces |
+## Current Deployed Models (g6e.12xlarge, 4× NVIDIA L40S GPUs)
 
-### Per-User Token Flow
-
-```
-X-Forwarded-User: user1
-  → _get_cached_user_token("user1")
-  → scan tier namespaces for SA starting with "user1-"
-  → found: user1-b3daa77b in maas-default-gateway-tier-premium
-  → TokenRequest API → 1h token (audience: maas-default-gateway-sa)
-  → cached in memory with TTL refresh at expiry-5min
-  → used for MaaS gateway calls → premium rate limits applied
-```
-
-If no tier SA found → falls back to shared `maas-gateway-token` (free tier, 5 req/2min shared).
-
-### notebook-api Endpoints
-
-| Endpoint | Notes |
-|---|---|
-| `GET /models` | Lists active LLMInferenceServices from K8s API |
-| `POST /notebooks` | Creates notebook + LlamaStack vector store |
-| `POST /notebooks/{id}/documents` | Upload + ingest (embed timeout: 600s for large files) |
-| `POST /notebooks/{id}/chat` | SSE streaming chat, uses per-user token |
-| `GET /user-token/{username}` | Returns tier SA token — internal use only |
-
----
-
-
-## LlamaStack Instances
-
-| Namespace | Service | Port | User |
+| Model | Parser | Chat Template | RAG Status |
 |---|---|---|---|
-| `wksp-user1` | `lsd-genai-playground-service` | 8321 | user1 |
-| `wksp-user2` | `lsd-genai-playground-service` | 8321 | user2 |
-| `mydsproject` | `lsd-genai-playground-service` | 8321 | admin |
+| `qwen3-4b-instruct` | `--tool-call-parser=hermes` | Built-in (tokenizer_config.json) | ✅ Full RAG + citations |
+| `llama-3-1-8b-instruct-fp8` | `--tool-call-parser=llama3_json` | `tool_chat_template_llama3.1_json.jinja` | ✅ Full RAG + citations |
+| `mistral-small-24b-fp8` | `--tool-call-parser=mistral` | `tool_chat_template_mistral3.jinja` | ❌ Outputs raw JSON tool calls — see "Current Issue" |
+| `phi-4-instruct-w8a8` | `--tool-call-parser=hermes` | None | Not registered in LlamaStack — deployed on cluster but not in ConfigMap models list |
 
-**notebook-api uses:** `lsd-genai-playground-service.wksp-user1.svc.cluster.local:8321`
-
----
-
-## 🔴 CRITICAL PENDING ISSUE — LlamaStack VLLM Token
-
-### Problem
-`VLLM_API_TOKEN_1: fake` is hardcoded in the `LlamaStackDistribution` CR.
-LlamaStack refreshes its model list from the MaaS gateway every 5 minutes using this
-token. When `fake` hits Kuadrant's `kubernetesTokenReview` it returns **401**.
-After several failed refreshes, inference requests also fail with 401.
-
-**This is why chat breaks for all users after ~5 minutes of a fresh LlamaStack pod.**
-
-### What Was Done
-- ✅ `llamastack-vllm-token` secret created in all 3 wksp namespaces with real 8760h SA token
-- ✅ Chart updated: `charts/llama-stack-instance/templates/llamastack-distribution.yaml`
-  now uses `valueFrom.secretKeyRef` pointing to `llamastack-vllm-token`
-- ✅ ArgoCD synced — `LlamaStackDistribution` CR now has `valueFrom.secretKeyRef`
-- ❌ **The `LlamaStackDistribution` operator does NOT propagate `valueFrom` to the Deployment**
-  It only renders `value: fake` into the Deployment spec regardless of what the CR says
-
-### Root Cause of Operator Limitation
-The operator (`registry.redhat.io/rhoai/odh-llama-stack-k8s-operator-rhel9`) reads
-`env[].value` fields from the CR and writes them verbatim to the Deployment.
-It does not pass through `valueFrom.secretKeyRef` — this is a bug/limitation in the
-operator version `0.4.0` on this cluster.
-
-### Resolution Options (pick one)
-
-**Option A — Patch Deployment directly + add ignoreDifferences to ArgoCD**
-```bash
-# Get real token
-TOKEN=$(oc get secret llamastack-vllm-token -n wksp-user1 \
-  -o jsonpath='{.data.token}' | base64 -d)
-
-# Patch deployment directly
-oc set env deployment/lsd-genai-playground \
-  VLLM_API_TOKEN_1="$TOKEN" -n wksp-user1
-
-# Also patch wksp-user2 and mydsproject
-```
-Then add `ignoreDifferences` to the `llama-stack-instance-user1` ArgoCD app so it
-doesn't revert the env var on next sync.
-
-**Option B — Patch the LlamaStackDistribution CR with literal token value**
-```bash
-TOKEN=$(oc get secret llamastack-vllm-token -n wksp-user1 \
-  -o jsonpath='{.data.token}' | base64 -d)
-
-oc patch llamastackdistribution lsd-genai-playground -n wksp-user1 \
-  --type=merge \
-  -p "{\"spec\":{\"server\":{\"containerSpec\":{\"env\":[
-    {\"name\":\"VLLM_TLS_VERIFY\",\"value\":\"false\"},
-    {\"name\":\"MILVUS_DB_PATH\",\"value\":\"~/.llama/milvus.db\"},
-    {\"name\":\"FMS_ORCHESTRATOR_URL\",\"value\":\"http://localhost\"},
-    {\"name\":\"VLLM_MAX_TOKENS\",\"value\":\"8192\"},
-    {\"name\":\"VLLM_API_TOKEN_1\",\"value\":\"$TOKEN\"},
-    {\"name\":\"LLAMA_STACK_CONFIG_DIR\",\"value\":\"/opt/app-root/src/.llama/distributions/rh/\"}
-  ]}}}}"
-```
-**This is the recommended option** — the operator WILL propagate a literal `value`
-to the Deployment. Token is 8760h (1 year) so refresh is not an issue.
-Repeat for `wksp-user2` and `mydsproject`.
-
-**Verification after fix:**
-```bash
-# Confirm token is real in pod env
-oc exec -n wksp-user1 deployment/lsd-genai-playground -- \
-  sh -c 'echo "token: ${VLLM_API_TOKEN_1:0:20}..."'
-# Should NOT print "token: fake..."
-
-# Confirm no more 401 errors
-oc logs -n wksp-user1 deployment/lsd-genai-playground --tail=10 | \
-  grep -E "401|Error|Model refresh"
-# Should be empty
-```
+**Embedding:** Snowflake Arctic Embed L v2.0 (1024-dim, 8192 context, multilingual) running as Deployment+Service in `llm` namespace via vLLM. Performance: 711 texts/sec GPU.
 
 ---
 
+## Data-Driven LlamaStack ConfigMap
 
-## Other Pending Items
+The ConfigMap template (`charts/llama-stack-instance/templates/configmap.yaml`) loops over a `models:` list in `values.yaml`. Each model gets its own `remote::vllm` provider with a dedicated MaaS gateway URL:
 
-### 1. user2 Has No Tier SA
-user2 is in `tier-premium-users` group but has no SA in any tier namespace.
-Chat works but falls back to shared free-tier token (5 req/2min shared).
-
-**Fix:** Create SA via maas-api onboarding flow, or manually:
-```bash
-HASH=$(echo -n "user2" | sha256sum | cut -c1-8)
-oc create sa user2-${HASH} -n maas-default-gateway-tier-premium
-oc label sa user2-${HASH} -n maas-default-gateway-tier-premium \
-  app.kubernetes.io/component=token-issuer \
-  app.kubernetes.io/part-of=maas-api \
-  maas.opendatahub.io/instance=maas-default-gateway \
-  maas.opendatahub.io/tier=premium
+```yaml
+# values.yaml
+models:
+  - name: qwen3-4b-instruct
+    displayName: Qwen3 4B Instruct 2507
+  - name: llama-3-1-8b-instruct-fp8
+    displayName: Llama 3.1 8B Instruct FP8
+  - name: mistral-small-24b-fp8
+    displayName: Mistral Small 3.1 24B Instruct FP8
 ```
 
-### 2. kube:admin Username Normalization Bug
-`kube:admin` has a colon but the tier SA is named `kube-admin-81378af5` (hyphen).
-The SA lookup uses `sa_name.startswith(f"{username}-")` which fails because
-`"kube-admin-...".startswith("kube:admin-")` is False.
+The template generates per-model providers and registered resources. All models show as "RAG enabled" in the UI dropdown. The notebook-api discovers models by querying **LlamaStack's `/v1/models` API** (not the Kubernetes API), so only models registered in the ConfigMap appear in the dropdown. The notebook-api maps UI model names to LlamaStack identifiers: `body.model` → `maas-{name}/{name}`.
 
-**Fix in `_get_user_maas_token` in `charts/notebook-api/app/main.py`:**
-```python
-# Normalize username — OpenShift uses "kube:admin" but SA names use hyphens
-normalized_username = username.replace(":", "-")
-user_sa = next(
-    (sa for sa in items if sa["metadata"]["name"].startswith(f"{normalized_username}-")),
-    None,
-)
-```
+---
 
-### 3. Notebook State is In-Memory Only
-`notebooks: dict[str, dict] = {}` in `main.py` — wiped on pod restart.
-Vector stores persist in Milvus PVCs but notebook metadata is lost.
-Users must create a new notebook after any pod restart.
+## Current Issue: Mistral Tool Calling
 
-**Fix:** Add SQLite or Redis persistence for the `notebooks` dict and `ingest_status`.
+**Problem:** Mistral Small 3.1 24B (`mistral-small-3-1-24b-instruct-2503-fp8`) outputs raw JSON tool calls as text instead of structured `tool_calls` objects via vLLM, even with `--tool-call-parser=mistral` and `--chat-template=tool_chat_template_mistral3.jinja`.
 
-### 4. UI Has No 404 Error Handling
-When a notebook ID no longer exists (pod restart), chat silently fails.
-The UI needs to detect HTTP 404 responses and prompt user to create a new notebook.
+**Evidence:**
+- Direct vLLM test with `tool_choice: "auto"` → `tool_calls: []`, content contains raw JSON `[{"name": "knowledge_search", ...}]`
+- Direct vLLM test with `tool_choice: "required"` → `tool_calls: 1`, structured JSON ✅
+- LlamaStack sends `tool_choice: "auto"` (we can't control this)
+- The `mistral` parser does not intercept tool calls under `tool_choice: "auto"` for this model variant
+- Tried all 3 available templates: `mistral.jinja`, `mistral_parallel.jinja`, `mistral3.jinja` — none work with `auto`
 
-### 5. mydsproject LlamaStack Not in ArgoCD
-`mydsproject` has a LlamaStack instance but no ArgoCD app manages it.
-The `llamastack-vllm-token` secret was created manually.
-Consider adding a `workspace-mydsproject` ArgoCD app mirroring `workspace-user1/2`.
+**Root cause:** vLLM's `mistral` tool-call parser has a compatibility issue with this specific Mistral model variant when `tool_choice` is `"auto"`. Additionally, Mistral's tokenizer requires tool call IDs exactly 9 digits long, which conflicts with vLLM's generated IDs.
+
+**Options to resolve:**
+
+1. **Swap model** — Replace with `mistralai/Mistral-Nemo-Instruct-2407` (12B). Older model but better vLLM compatibility. Requires new modelcar image + LLMInferenceService. Moderate effort.
+
+2. **Swap model** — Try `Mistral-Small-3.2-24B-Instruct-2506` (newer variant). May have better vLLM support. Requires checking if Red Hat has a modelcar image for it.
+
+3. **Mark Mistral as non-RAG** — Restore per-model `rag_enabled` logic in notebook-api's model discovery (currently hardcoded to `True` for all models). Mistral works for plain chat, just not with file_search tool calling. Low effort, but reduces demo impact.
+
+4. **Implement fallback path** — For models where the Responses API fails, manually retrieve context via vector store search and inject into chat completions prompt. Goes against the "thin wrapper" principle. Not recommended.
+
+5. **Wait for vLLM/LlamaStack fixes** — Newer vLLM versions or LlamaStack v0.4+ may resolve the parser issue. Zero effort on our side.
+
+**Current state:** Mistral template is set to `mistral3.jinja` (commit `27e9007`). Mistral works for plain chat but outputs raw tool call JSON for RAG queries. Users see `[{"name": "knowledge_search", ...}]` as the response when using Mistral on notebooks with documents.
+
+---
+
+## Feature Enhancements Backlog
+
+### Completed (6)
+
+| Feature | Implementation |
+|---|---|
+| Source upload + RAG chat | Files API + vector_stores + Responses API with file_search |
+| Notebook + document management | vector_stores CRUD, files CRUD, delete buttons in UI |
+| Chat history persistence | GET /v1/responses (stored in sql_store.db), loaded on notebook select |
+| Multi-model RAG | Data-driven ConfigMap, per-model remote::vllm providers, all models in dropdown |
+| Simulated streaming | Non-streaming Responses API → word-level SSE chunks with 20ms delays |
+| Source citations in chat | file_citation annotations from Responses API → deduplicated badges in UI |
+
+### Can Build — UI/API Wrapper Work Only (7)
+
+| Feature | Implementation | Effort | Notes |
+|---|---|---|---|
+| Multi-turn conversation | Pass `previous_response_id` in Responses API | 2h | LlamaStack manages context natively |
+| Skip file_search on empty notebooks | If `file_counts.completed == 0`, omit tools param | 30m | Prevents Llama/Mistral tool call leaks on empty notebooks |
+| Study guide / FAQ generation | Responses API + prompt template, render as markdown | 3h | Same pattern as chat, different prompt |
+| Flashcards / Quiz | Responses API + JSON output prompt, card flip UI | 4h | LLM generates, UI renders |
+| Mind map | Responses API + JSON graph prompt, D3 render | 5h | LLM generates, UI renders |
+| Data table extraction | Responses API + JSON table prompt, HTML table UI | 4h | LLM generates, UI renders |
+| Scoped source selection | `file_search.filters` param in Responses API | 3h | Untested — needs validation. Would allow chatting with subset of documents |
+
+### Blocked by LlamaStack v0.3.5 Bugs (2)
+
+| Feature | Bug | Impact |
+|---|---|---|
+| Response grounding (answer only from docs) | `instructions` field causes `file_search` to be skipped entirely | Models answer from own knowledge instead of documents. Zero effort to fix once LlamaStack resolves the bug — just add the `instructions` field back. |
+| Native streaming | `stream: true` doesn't inject file_search context into model prompt | Currently using non-streaming + simulated streaming workaround. Zero effort to switch once fixed. |
+
+### Out of Scope — Needs Capabilities Beyond LlamaStack (4)
+
+| Feature | Requires |
+|---|---|
+| Audio overview (podcast) | TTS model |
+| Video overview | TTS + image gen + video composition |
+| Slide deck generation | Image generation model |
+| Infographic generation | Image generation model |
+
+---
+
+## Known LlamaStack v0.3.5 Bugs
+
+1. **`instructions` + `file_search` conflict** — Providing `instructions` field in Responses API causes `file_search` to be skipped entirely. The model answers from its own knowledge. Workaround: removed `instructions` field.
+
+2. **Streaming + `file_search`** — Streaming mode (`stream: true`) performs file_search but does NOT inject retrieved context into the model prompt. The model generates hallucinated answers. Workaround: use non-streaming `responses_sync()` + simulated streaming.
+
+3. **RAG prompt leakage** — LlamaStack injects internal citation instructions into the system prompt. Models sometimes output these as text (e.g., "Cite sources immediately at the end of sentences..."). We do NOT strip this in the wrapper — it's a LlamaStack behavior. Will be resolved when the `instructions` bug is fixed.
 
 ---
 
@@ -247,80 +147,68 @@ Consider adding a `workspace-mydsproject` ArgoCD app mirroring `workspace-user1/
 
 | File | Purpose |
 |---|---|
-| `charts/notebook-api/app/main.py` | FastAPI app, per-user token, token cache, model discovery |
-| `charts/notebook-api/app/llamastack_client.py` | Vector store, RAG retrieval, streaming chat |
-| `charts/notebook-api/app/ingest.py` | PDF/DOCX text extraction, LlamaStack file upload + embed |
-| `charts/notebook-api/app/config.py` | Settings: llamastackUrl, maasBaseUrl, maasToken, tierNamespaces |
-| `charts/notebook-api/templates/rbac.yaml` | SA + Roles for LLMInferenceService list + tier SA tokens |
-| `charts/notebook-ui/templates/deployment.yaml` | oauth-proxy sidecar + nginx |
-| `charts/notebook-ui/templates/sa.yaml` | SA with oauth-redirectreference annotation |
-| `charts/llama-stack-instance/templates/llamastack-distribution.yaml` | LlamaStack CR (valueFrom not propagated by operator — see issue above) |
-| `setup/configure.sh` | Full deployment automation script |
+| `charts/llama-stack-instance/templates/configmap.yaml` | Data-driven LlamaStack config — loops over models list |
+| `charts/llama-stack-instance/values.yaml` | Models list (Qwen, Llama, Mistral) |
+| `charts/models/values.yaml` | vLLM model deployments — extraArgs with tool parsers + chat templates |
+| `charts/notebook-api/app/main.py` | FastAPI proxy — chat, notebooks, documents, history endpoints |
+| `charts/notebook-api/app/llamastack_client.py` | LlamaStack API client — responses_sync, list_responses, etc. |
+| `charts/notebook-api/app/config.py` | Settings — llamastack_url, model_id defaults |
+| `charts/notebook-ui/app/src/App.tsx` | React UI — notebooks, chat, model selector, citations |
+| `charts/embed-model/` | Snowflake embedding Deployment+Service chart |
+| `bootstrap/templates/applications/` | ArgoCD ApplicationSet definitions |
 
 ---
 
-## Standard Operations
+## Recent Git Commits (newest first)
 
-### Rebuild notebook-api
-```bash
-oc start-build notebook-api -n maas-rag
-# Watch: oc get builds -n maas-rag -w
-oc rollout restart deployment/notebook-api -n maas-rag
 ```
-
-### Rebuild notebook-ui
-```bash
-oc start-build notebook-ui -n maas-rag
-oc rollout restart deployment/notebook-ui -n maas-rag
-```
-
-### ArgoCD hard refresh + force sync
-```bash
-oc annotate application <app-name> -n openshift-gitops \
-  argocd.argoproj.io/refresh=hard --overwrite
-sleep 20
-oc patch application <app-name> -n openshift-gitops --type merge \
-  -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"HEAD","prune":true}}}'
-```
-
-### Suspend ArgoCD selfHeal (before live cluster edits)
-```bash
-oc patch application <app-name> -n openshift-gitops --type merge \
-  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":false,"prune":true}}}}'
-# ... make changes ...
-# Re-enable:
-oc patch application <app-name> -n openshift-gitops --type merge \
-  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":true,"prune":true}}}}'
-```
-
-### Check notebook-api logs
-```bash
-oc logs -n maas-rag deployment/notebook-api -f | \
-  grep -E "per-user token|fallback|Ingest|ERROR|401|429"
-```
-
-### Check oauth-proxy auth
-```bash
-oc logs -n maas-rag -l app=notebook-ui -c oauth-proxy | \
-  grep "authentication complete"
+7d1b761 fix: deduplicate models from LlamaStack by name
+db2baf0 fix: discover models from LlamaStack instead of Kubernetes API
+27e9007 fix: use mistral3 chat template for Mistral Small 3.1
+b8b2c9e revert: remove RAG prompt leakage stripping
+4bdf6ed feat: source citations in chat responses
+a48cdd9 fix: add --chat-template for Llama and Mistral tool calling
+54bded5 feat: all models RAG-enabled — data-driven LlamaStack ConfigMap
+420637b feat: simulate streaming by sending response in word-level chunks
+54b867e feat: conversation history — persists across sessions
+e87b14a feat: delete individual documents from notebooks
+2fa87da feat: add delete notebook button with confirmation dialog
+d87c1e5 feat: add embed-model ArgoCD Application to bootstrap
+f8ca88a fix: increase upload limit to 50MB
+7986dd5 fix: use Deployment+Service for Snowflake embed
+4fa24ca feat: switch to Snowflake Arctic Embed L v2.0 on GPU
 ```
 
 ---
 
-## Git Workflow — ALWAYS Local First
+## Key Principles (DO follow these)
 
-```bash
-# Always pull before editing
-cd /Users/aelnatsh/Lab/MaaS
-git pull origin main
+1. **Thin wrapper** — The notebook-api is a passthrough to LlamaStack. Do NOT add custom logic for model behavior, response formatting, or retrieval. If something doesn't work, it's a LlamaStack or vLLM issue to track, not something to workaround in the wrapper.
 
-# Edit files locally
-# Commit and push
-git add <files>
-git commit -m "feat/fix: description"
-git push origin main
-```
+2. **Assess before acting** — Always determine whether an issue is pre-existing and non-blocking before attempting a fix. Never modify working configuration while troubleshooting an unrelated issue.
 
-**NEVER use GitHub API (`github:push_files` / `github:create_or_update_file`) directly
-for code changes — always go through local git to avoid conflicts.**
+3. **Validate live before committing** — Test fixes on the live cluster before committing to git. Check git status and revert uncommitted local changes before starting new work.
 
+4. **GitOps is the single source of truth** — All fixes must be committed to the repo. Live-only changes are explicitly avoided.
+
+5. **Don't over-fix** — Don't pursue changes unless they are clearly blocking something.
+
+6. **No credentials in repo** — No cluster-specific identifiers, credentials, or real values committed to the public GitHub repo.
+
+---
+
+## Workflow Patterns
+
+- **Local git workflow:** All file changes are made on the local clone at `/Users/aelnatsh/Lab/MaaS` using Desktop Commander, then committed and pushed to GitHub via `git add` → `git commit` → `git push origin main`.
+- **ArgoCD sync:** `annotate refresh=hard` → `sleep 20` → status check → then `patch operation sync` if needed.
+- **Cluster access:** `oc login` requires `--insecure-skip-tls-verify=true`.
+- **Build and deploy notebook-api/ui:** `oc start-build notebook-api -n maas-rag` → wait for Complete → `oc rollout restart deployment/notebook-api -n maas-rag`.
+
+---
+
+## Immediate Next Actions
+
+1. **Decide on Mistral** — Choose from the 5 options listed in "Current Issue: Mistral Tool Calling" above.
+2. **Skip file_search on empty notebooks** (30min) — Prevents Llama and Mistral from leaking tool call text when no documents are uploaded.
+3. **Multi-turn conversation** (2h) — Pass `previous_response_id` to maintain chat context across turns.
+4. **HANDOVER.md** — Commit the updated handover doc to the repo.
