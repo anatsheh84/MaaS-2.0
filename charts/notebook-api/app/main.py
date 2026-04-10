@@ -61,55 +61,31 @@ async def healthz():
 
 @app.get("/models")
 async def list_models():
-    """Discover deployed LLM models from Kubernetes LLMInferenceService resources."""
-    token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-    ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-    k8s_host = "https://kubernetes.default.svc"
+    """Discover LLM models registered in LlamaStack.
 
-    try:
-        import os
-        if os.path.exists(token_path):
-            with open(token_path) as f:
-                token = f.read().strip()
-            async with httpx.AsyncClient(timeout=10.0, verify=ca_path) as client:
-                resp = await client.get(
-                    f"{k8s_host}/apis/serving.kserve.io/v1alpha1/namespaces/llm/llminferenceservices",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                resp.raise_for_status()
-                items = resp.json().get("items", [])
-            # All LLM models are RAG-enabled (each has its own provider in LlamaStack)
-            models = [
-                {
-                    "value": item["metadata"]["name"],
-                    "label": (
-                        item["metadata"].get("annotations", {})
-                        .get("openshift.io/display-name")
-                        or item["metadata"]["name"].replace("-", " ").title()
-                    ),
-                    "rag_enabled": True,
-                }
-                for item in items
-                if item.get("status", {}).get("conditions", [{}])[0].get("status") != "False"
-            ]
-            logger.info("Discovered %d models from Kubernetes API", len(models))
-            return {"models": models}
-    except Exception as e:
-        logger.warning("Kubernetes model discovery failed: %s", e)
-
-    # Fallback — LlamaStack /v1/models
+    Only models registered in the LlamaStack ConfigMap are returned — these are
+    the models that can actually serve requests via the Responses API.
+    """
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{settings.llamastack_url}/v1/models")
             resp.raise_for_status()
             data = resp.json().get("data", [])
-        return {"models": [
-            {"value": m["identifier"].split("/")[-1],
-             "label": m["identifier"].split("/")[-1].replace("-", " ").title()}
+        models = [
+            {
+                "value": m["identifier"].split("/")[-1],
+                "label": (
+                    m.get("metadata", {}).get("display_name")
+                    or m["identifier"].split("/")[-1].replace("-", " ").title()
+                ),
+                "rag_enabled": True,
+            }
             for m in data if m.get("model_type") == "llm"
-        ]}
+        ]
+        logger.info("Discovered %d models from LlamaStack", len(models))
+        return {"models": models}
     except Exception as e:
-        logger.warning("LlamaStack model fallback also failed: %s", e)
+        logger.warning("LlamaStack model discovery failed: %s", e)
         return {"models": []}
 
 
