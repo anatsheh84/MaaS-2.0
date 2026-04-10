@@ -71,17 +71,23 @@ async def list_models():
             resp = await client.get(f"{settings.llamastack_url}/v1/models")
             resp.raise_for_status()
             data = resp.json().get("data", [])
-        models = [
-            {
-                "value": m["identifier"].split("/")[-1],
+        models = []
+        seen = set()
+        for m in data:
+            if m.get("model_type") != "llm":
+                continue
+            value = m["identifier"].split("/")[-1]
+            if value in seen:
+                continue
+            seen.add(value)
+            models.append({
+                "value": value,
                 "label": (
                     m.get("metadata", {}).get("display_name")
-                    or m["identifier"].split("/")[-1].replace("-", " ").title()
+                    or value.replace("-", " ").title()
                 ),
                 "rag_enabled": True,
-            }
-            for m in data if m.get("model_type") == "llm"
-        ]
+            })
         logger.info("Discovered %d models from LlamaStack", len(models))
         return {"models": models}
     except Exception as e:
