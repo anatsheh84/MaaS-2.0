@@ -19,6 +19,7 @@ models:
   - name: granite-4-0-h-small-fp8
     displayName: Granite 4.0-H Small FP8
     url: http://granite-4-0-h-small-fp8.llm.svc.cluster.local:8000/v1
+    maxTokens: 4096
 
 # Persistent storage for LlamaStack data (vector stores, files, metadata)
 storage:

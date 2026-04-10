@@ -32,7 +32,11 @@ data:
         provider_type: remote::vllm
         config:
           api_token: ${env.VLLM_API_TOKEN_1:=fake}
+          {{- if .maxTokens }}
+          max_tokens: {{ .maxTokens }}
+          {{- else }}
           max_tokens: ${env.VLLM_MAX_TOKENS:=8192}
+          {{- end }}
           tls_verify: ${env.VLLM_TLS_VERIFY:=true}
           {{- if .url }}
           url: {{ .url }}
