@@ -17,9 +17,15 @@ spec:
   destination:
     name: in-cluster
     namespace: llm
+  ignoreDifferences:
+    - group: serving.kserve.io
+      kind: LLMInferenceService
+      jsonPointers:
+        - /metadata/annotations/serving.kserve.io~1stop
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - RespectIgnoreDifferences=true
