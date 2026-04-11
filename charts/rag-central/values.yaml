@@ -1,0 +1,69 @@
+namespace: rag-central
+
+# ── LlamaStack ────────────────────────────────────────────────────────────────
+llamastack:
+  image: registry.redhat.io/rhoai/odh-llama-stack-core-rhel9@sha256:049b304f527514510d39bf94ac8f41b89746901ebc1f0bc26bc8dbba9c8854f4
+  replicas: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+postgres:
+  image: registry.redhat.io/rhel9/postgresql-16@sha256:a8c9a313f69ab99bd8b46ce5df7cb78b00808eedd4f8da05f4654f76c14a152c
+  storageSize: 10Gi
+  storageClass: gp3-csi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+# ── Milvus ─────────────────────────────────────────────────────────────────────
+milvus:
+  image: milvusdb/milvus:v2.4.9
+  storageSize: 100Gi
+  storageClass: gp3-csi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+etcd:
+  image: quay.io/coreos/etcd:v3.5.16
+  storageSize: 5Gi
+  storageClass: gp3-csi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+minio:
+  image: quay.io/minio/minio:RELEASE.2024-09-22T00-33-43Z
+  storageSize: 100Gi
+  storageClass: gp3-csi
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  defaultBucket: milvus-bucket
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# ── Deployer (injected by bootstrap) ──────────────────────────────────────────
+deployer:
+  domain: ""

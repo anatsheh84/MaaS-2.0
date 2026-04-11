@@ -1,0 +1,145 @@
+---
+# LlamaStack — stateless deployment using the RHOAI built-in parameterized config.
+# All backends (Postgres, Milvus, S3) are configured via environment variables.
+# No custom ConfigMap needed — the RHOAI image has a built-in config at
+# /opt/app-root/config.yaml that reads all settings from env vars.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llamastack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: llamastack
+    app.kubernetes.io/part-of: rag-central
+spec:
+  replicas: {{ .Values.llamastack.replicas }}
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: llamastack
+  template:
+    metadata:
+      labels:
+        app: llamastack
+    spec:
+      containers:
+      - name: llamastack
+        image: {{ .Values.llamastack.image }}
+        env:
+        # ── PostgreSQL storage backends ──
+        - name: POSTGRES_HOST
+          value: llamastack-postgres.{{ .Values.namespace }}.svc.cluster.local
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: llamastack
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-postgres
+              key: database-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-postgres
+              key: database-password
+        # ── Inference via MaaS gateway ──
+        - name: VLLM_URL
+          value: http://maas.{{ .Values.deployer.domain }}/llm/llama-3-1-8b-instruct-fp8/v1
+        - name: VLLM_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-vllm-token
+              key: token
+        - name: VLLM_TLS_VERIFY
+          value: "false"
+        - name: VLLM_MAX_TOKENS
+          value: "8192"
+        # ── Embedding model ──
+        - name: VLLM_EMBEDDING_URL
+          value: http://snowflake-embed.llm.svc.cluster.local:8000/v1
+        - name: VLLM_EMBEDDING_API_TOKEN
+          value: fake
+        - name: VLLM_EMBEDDING_TLS_VERIFY
+          value: "false"
+        # ── Remote Milvus ──
+        - name: MILVUS_ENDPOINT
+          value: http://milvus.{{ .Values.namespace }}.svc.cluster.local:19530
+        - name: MILVUS_TOKEN
+          value: ""
+        - name: MILVUS_CONSISTENCY_LEVEL
+          value: Strong
+        # ── S3 files storage ──
+        - name: ENABLE_S3
+          value: "true"
+        - name: S3_BUCKET_NAME
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-s3
+              key: bucket-name
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-s3
+              key: region
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-s3
+              key: aws-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-s3
+              key: aws-secret-access-key
+        # ── Runtime config ──
+        - name: LLAMA_STACK_CONFIG_DIR
+          value: /tmp/llama-runtime
+        ports:
+        - containerPort: 8321
+          name: http
+        startupProbe:
+          httpGet:
+            path: /v1/health
+            port: 8321
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 30
+        livenessProbe:
+          httpGet:
+            path: /v1/health
+            port: 8321
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /v1/health
+            port: 8321
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.llamastack.resources | nindent 10 }}
+        volumeMounts:
+        - name: runtime
+          mountPath: /tmp/llama-runtime
+        - name: llama-home
+          mountPath: /opt/app-root/src/.llama
+      volumes:
+      - name: runtime
+        emptyDir: {}
+      - name: llama-home
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llamastack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: llamastack
+    app.kubernetes.io/part-of: rag-central
+spec:
+  selector:
+    app: llamastack
+  ports:
+  - port: 8321
+    targetPort: 8321
+    name: http

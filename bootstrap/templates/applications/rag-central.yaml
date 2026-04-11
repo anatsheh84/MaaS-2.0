@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rag-central
+  namespace: openshift-gitops
+  annotations:
+    # Wave 8 — after models and embed-model (wave 6-7)
+    argocd.argoproj.io/sync-wave: "8"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.bootstrap.repoURL }}
+    targetRevision: {{ .Values.bootstrap.targetRevision }}
+    path: charts/rag-central
+    helm:
+      values: |
+        deployer:
+          domain: {{ .Values.deployer.domain }}
+  destination:
+    name: in-cluster
+    namespace: rag-central
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

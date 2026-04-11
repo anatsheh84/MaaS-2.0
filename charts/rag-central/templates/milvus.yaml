@@ -1,0 +1,254 @@
+---
+# ── PVCs ──────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: milvus-data
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.milvus.storageSize }}
+  storageClassName: {{ .Values.milvus.storageClass }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: milvus-etcd
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.etcd.storageSize }}
+  storageClassName: {{ .Values.etcd.storageClass }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: milvus-minio
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.minio.storageSize }}
+  storageClassName: {{ .Values.minio.storageClass }}
+---
+# ── etcd ──────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: milvus-etcd
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: milvus-etcd
+    app.kubernetes.io/part-of: rag-central
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: milvus-etcd
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: milvus-etcd
+    spec:
+      containers:
+      - name: etcd
+        image: {{ .Values.etcd.image }}
+        command: [etcd]
+        args:
+        - --advertise-client-urls=http://0.0.0.0:2379
+        - --listen-client-urls=http://0.0.0.0:2379
+        - --data-dir=/etcd-data
+        - --auto-compaction-mode=revision
+        - --auto-compaction-retention=1000
+        - --max-txn-ops=10000
+        - --quota-backend-bytes=4294967296
+        env:
+        - name: ETCD_ENABLE_PPROF
+          value: "true"
+        ports:
+        - containerPort: 2379
+          name: client
+        volumeMounts:
+        - name: etcd-data
+          mountPath: /etcd-data
+        resources:
+          {{- toYaml .Values.etcd.resources | nindent 10 }}
+      volumes:
+      - name: etcd-data
+        persistentVolumeClaim:
+          claimName: milvus-etcd
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: milvus-etcd
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: milvus-etcd
+    app.kubernetes.io/part-of: rag-central
+spec:
+  selector:
+    app: milvus-etcd
+  ports:
+  - port: 2379
+    targetPort: 2379
+    name: client
+---
+# ── MinIO ─────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: milvus-minio
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: milvus-minio
+    app.kubernetes.io/part-of: rag-central
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: milvus-minio
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: milvus-minio
+    spec:
+      containers:
+      - name: minio
+        image: {{ .Values.minio.image }}
+        command: [minio]
+        args: [server, /data, --console-address, ":9001"]
+        env:
+        - name: MINIO_ROOT_USER
+          value: {{ .Values.minio.rootUser }}
+        - name: MINIO_ROOT_PASSWORD
+          value: {{ .Values.minio.rootPassword }}
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
+        resources:
+          {{- toYaml .Values.minio.resources | nindent 10 }}
+      volumes:
+      - name: minio-data
+        persistentVolumeClaim:
+          claimName: milvus-minio
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: milvus-minio
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: milvus-minio
+    app.kubernetes.io/part-of: rag-central
+spec:
+  selector:
+    app: milvus-minio
+  ports:
+  - port: 9000
+    targetPort: 9000
+    name: api
+  - port: 9001
+    targetPort: 9001
+    name: console
+---
+# ── Milvus Standalone ─────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: milvus
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: milvus
+    app.kubernetes.io/part-of: rag-central
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: milvus
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: milvus
+    spec:
+      containers:
+      - name: milvus
+        image: {{ .Values.milvus.image }}
+        command: [milvus, run, standalone]
+        env:
+        - name: ETCD_ENDPOINTS
+          value: milvus-etcd.{{ .Values.namespace }}.svc.cluster.local:2379
+        - name: MINIO_ADDRESS
+          value: milvus-minio.{{ .Values.namespace }}.svc.cluster.local:9000
+        - name: MINIO_ACCESS_KEY
+          value: {{ .Values.minio.rootUser }}
+        - name: MINIO_SECRET_KEY
+          value: {{ .Values.minio.rootPassword }}
+        - name: MINIO_USE_SSL
+          value: "false"
+        - name: MINIO_BUCKET_NAME
+          value: {{ .Values.minio.defaultBucket }}
+        ports:
+        - containerPort: 19530
+          name: grpc
+        - containerPort: 9091
+          name: metrics
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 9091
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 9091
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        volumeMounts:
+        - name: milvus-data
+          mountPath: /var/lib/milvus
+        resources:
+          {{- toYaml .Values.milvus.resources | nindent 10 }}
+      volumes:
+      - name: milvus-data
+        persistentVolumeClaim:
+          claimName: milvus-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: milvus
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: milvus
+    app.kubernetes.io/part-of: rag-central
+spec:
+  selector:
+    app: milvus
+  ports:
+  - port: 19530
+    targetPort: 19530
+    name: grpc
+  - port: 9091
+    targetPort: 9091
+    name: metrics
