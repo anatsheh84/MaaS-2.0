@@ -300,8 +300,8 @@ async def chat(
     username = _get_username(x_forwarded_user)
     logger.info("Chat: user=%s notebook=%s model=%s", username, notebook_id, body.model)
 
-    # Map UI model name to LlamaStack model identifier (provider_id/model_id)
-    model_id = f"maas-{body.model}/{body.model}" if body.model else None
+    # Model ID from the UI is already the full LlamaStack identifier
+    model_id = body.model or None
 
     async def stream_gen():
         """Use non-streaming Responses API (streaming has a LlamaStack v0.3.5 bug
