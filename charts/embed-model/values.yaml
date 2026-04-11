@@ -22,6 +22,6 @@ models:
         memory: 16Gi
         nvidia.com/gpu: "1"
     extraArgs:
-      - --max-model-len=8192
+      - --max-model-len=2048
       - --gpu-memory-utilization=0.3
       - --trust-remote-code
