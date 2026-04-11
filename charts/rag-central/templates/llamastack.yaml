@@ -57,7 +57,7 @@ spec:
           value: "8192"
         # ── Embedding model ──
         - name: VLLM_EMBEDDING_URL
-          value: http://snowflake-embed.llm.svc.cluster.local:8000/v1
+          value: http://nomic-embed.llm.svc.cluster.local:8000/v1
         - name: VLLM_EMBEDDING_API_TOKEN
           value: fake
         - name: VLLM_EMBEDDING_TLS_VERIFY

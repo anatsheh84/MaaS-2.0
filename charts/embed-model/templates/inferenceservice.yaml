@@ -26,10 +26,12 @@ spec:
       - name: vllm
         image: {{ .image | default $.Values.image }}
         command:
-        - vllm
-        - serve
-        - {{ .hfModel }}
+        - python
+        - -m
+        - vllm.entrypoints.openai.api_server
+        args:
         - "--served-model-name={{ .name }}"
+        - "--model={{ .hfModel }}"
         {{- range .extraArgs }}
         - {{ . | quote }}
         {{- end }}

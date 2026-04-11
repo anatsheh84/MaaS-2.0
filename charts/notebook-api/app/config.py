@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # LlamaStack — all RAG operations (files, vector stores, responses)
     llamastack_url: str = "http://llamastack:8321"
-    llamastack_embedding_model: str = "sentence-transformers/snowflake-embed"
+    llamastack_embedding_model: str = "vllm-embedding/nomic-embed"
     llamastack_model_id: str = "maas-qwen3-4b-instruct/qwen3-4b-instruct"
     llamastack_vector_provider: str = ""  # e.g. "milvus-remote" when multiple providers exist
 
