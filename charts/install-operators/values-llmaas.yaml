@@ -4,6 +4,6 @@ operators:
     ownSubscription: false
     namespace: redhat-ods-operator
     startingCSV: rhods-operator.3.4.0-ea.1
-    installPlanApproval: Manual
+    installPlanApproval: Automatic
     operatorGroup:
       enabled: true
