@@ -1,5 +1,5 @@
 namespace: maas-rag
-llamastackUrl: "http://lsd-genai-playground-service.wksp-user1.svc.cluster.local:8321"
+llamastackUrl: "http://llamastack.rag-central.svc.cluster.local:8321"
 llamastackEmbeddingModel: "sentence-transformers/snowflake-embed"
 maasBaseUrl: "https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com"
 topKResults: "5"
