@@ -74,16 +74,18 @@ async def list_models():
         models = []
         seen = set()
         for m in data:
-            if m.get("model_type") != "llm":
+            meta = m.get("custom_metadata", {})
+            if meta.get("model_type", m.get("model_type")) != "llm":
                 continue
-            value = m["identifier"].split("/")[-1]
-            if value in seen:
+            value = m.get("id", m.get("identifier", "")).split("/")[-1]
+            if not value or value in seen:
                 continue
             seen.add(value)
             models.append({
                 "value": value,
                 "label": (
-                    m.get("metadata", {}).get("display_name")
+                    meta.get("display_name")
+                    or m.get("metadata", {}).get("display_name")
                     or value.replace("-", " ").title()
                 ),
                 "rag_enabled": True,
