@@ -10,7 +10,7 @@
 
 bootstrap:
   repoURL: https://github.com/anatsheh84/MaaS-2.0
-  targetRevision: main
+  targetRevision: rhoai-3.4
 
 # ── Cluster-specific (populated by configure.sh, never committed) ─────────────
 cluster:

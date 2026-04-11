@@ -3,9 +3,9 @@ global:
 
 operators: {}
 # rhods-operator:
-#   channel: stable-3.x
+#   channel: beta
 #   installPlanApproval: Manual
-#   startingCSV: rhods-operator.3.4.0
+#   startingCSV: rhods-operator.3.4.0-ea.1
 #   namespace: redhat-ods-operator
 #   operatorGroup:
 #     enabled: true
