@@ -355,7 +355,7 @@ spec:
     type: Git
     git:
       uri: https://github.com/anatsheh84/MaaS-2.0
-      ref: main
+      ref: rhoai-3.4
     contextDir: ${CONTEXT_DIR}
   strategy:
     type: Docker
