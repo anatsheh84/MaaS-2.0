@@ -25,3 +25,4 @@ models:
     extraArgs:
       - --max-model-len=8192
       - --gpu-memory-utilization=0.3
+      - --override-pooler-config={"pooling_type":"MEAN","normalize":true}
