@@ -5,6 +5,5 @@ maasBaseUrl: "https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com"
 topKResults: "5"
 chunkSize: "512"
 
-tierNamespaces:
-  - maas-default-gateway-tier-free
-  - maas-default-gateway-tier-premium
+# Disabled until maas-controller provisions tier namespaces
+tierNamespaces: []
