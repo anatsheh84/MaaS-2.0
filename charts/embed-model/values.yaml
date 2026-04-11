@@ -1,12 +1,12 @@
 # Shared GPU embedding model for all LlamaStack instances
 # ────────────────────────────────────────────────────────
 # Runs on GPU via vLLM — serves /v1/embeddings endpoint.
-# Downloads from HuggingFace at startup (vLLM 3.2.5 bug with modelcar paths for encoder models).
+# Downloads from HuggingFace at startup (vLLM 3.2.5 bug with modelcar paths — re-test with 3.3.0).
 # Snowflake Arctic Embed L v2.0: 8192 context, 1024 dim, multilingual
 
 namespace: llm
 
-image: registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.5
+image: registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.3.0
 
 models:
   - name: snowflake-embed

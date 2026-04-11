@@ -42,7 +42,7 @@ spec:
           },
           "options": {
             "mode": "html",
-            "content": "<div style='background:#1a1a2e;padding:16px;border-radius:8px;border-left:4px solid #cc0000;font-family:sans-serif'><h2 style='color:#fff;margin:0 0 8px'>\ud83c\uddf8\ud83c\udde6 SDAIA AI Ethics Principles \u2014 Live Compliance Dashboard</h2><p style='color:#aaa;margin:0'>Monitoring 4 active LLM models against SDAIA AI Ethics Principles v2.0 (Sep 2023) | Principle 5: Reliability &amp; Safety | Principle 7: Accountability &amp; Responsibility | Namespace: <b style='color:#f90'>llm</b> | Platform: <b style='color:#f90'>OpenShift AI 3.2 / vLLM / KServe</b></p></div>"
+            "content": "<div style='background:#1a1a2e;padding:16px;border-radius:8px;border-left:4px solid #cc0000;font-family:sans-serif'><h2 style='color:#fff;margin:0 0 8px'>\ud83c\uddf8\ud83c\udde6 SDAIA AI Ethics Principles \u2014 Live Compliance Dashboard</h2><p style='color:#aaa;margin:0'>Monitoring 4 active LLM models against SDAIA AI Ethics Principles v2.0 (Sep 2023) | Principle 5: Reliability &amp; Safety | Principle 7: Accountability &amp; Responsibility | Namespace: <b style='color:#f90'>llm</b> | Platform: <b style='color:#f90'>OpenShift AI 3.4 / vLLM / KServe</b></p></div>"
           }
         },
         {

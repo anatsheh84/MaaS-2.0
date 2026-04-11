@@ -2,7 +2,8 @@
 ---
 # Shared GPU embedding model served via vLLM.
 # Deployed as Deployment+Service (not LLMInferenceService) because vLLM 3.2.5
-# has a bug validating /mnt/models as a HuggingFace repo ID for encoder models.
+# had a bug validating /mnt/models as a HuggingFace repo ID for encoder models.
+# TODO: Re-test with vLLM 3.3.0 — this workaround may no longer be needed.
 # Downloads model from HuggingFace at startup instead.
 apiVersion: apps/v1
 kind: Deployment
