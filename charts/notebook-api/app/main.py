@@ -304,62 +304,62 @@ async def chat(
     model_id = body.model or None
 
     async def stream_gen():
-        """Use non-streaming Responses API (streaming has a LlamaStack v0.3.5 bug
-        where file_search results aren't injected into the model context).
-        Convert the complete response to SSE events for the UI.
+        """Stream responses from LlamaStack's Responses API (v0.5.0+).
+
+        LlamaStack 0.5.0 fixed the v0.3.5 bug where file_search results
+        were not injected into model context during streaming. The streaming
+        event format follows the OpenAI Responses API:
+          - response.output_text.delta → text chunks
+          - response.file_search_call.completed → search done
+          - response.completed → final response with usage
+        We convert these to the SSE format the frontend expects:
+          data: {"choices": [{"index": 0, "delta": {"content": "..."}}]}
         """
         import json as _json
 
         try:
-            result = await llamastack_client.responses_sync(
+            citations = []
+            async for chunk in llamastack_client.responses_stream(
                 query=body.query,
                 vector_store_ids=[notebook_id],
                 model=model_id or None,
-            )
+            ):
+                try:
+                    event = _json.loads(chunk)
+                except (ValueError, TypeError):
+                    continue
 
-            # Check for errors
-            if result.get("error"):
-                error_msg = result["error"].get("message", "Unknown error")
-                compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {error_msg}"}}]}
-                yield f"data: {_json.dumps(compat)}\n\n"
-            elif result.get("status") == "failed":
-                error_msg = result.get("error", {}).get("message", "Response failed")
-                compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {error_msg}"}}]}
-                yield f"data: {_json.dumps(compat)}\n\n"
-            else:
-                # Extract text and citations from the response output
-                import asyncio as _asyncio
-                citations = []
-                for output in result.get("output", []):
-                    if output.get("type") == "message":
-                        for content in output.get("content", []):
-                            if content.get("type") == "output_text":
-                                text = content.get("text", "")
-                                # Collect unique citations
+                event_type = event.get("type", "")
+
+                # Text delta — the main streaming content
+                if event_type == "response.output_text.delta":
+                    delta_text = event.get("delta", "")
+                    if delta_text:
+                        compat = {"choices": [{"index": 0, "delta": {"content": delta_text}}]}
+                        yield f"data: {_json.dumps(compat)}\n\n"
+
+                # Completed response — extract citations from annotations
+                elif event_type == "response.completed":
+                    resp = event.get("response", {})
+                    for output in resp.get("output", []):
+                        if output.get("type") == "message":
+                            for content in output.get("content", []):
                                 for ann in content.get("annotations", []):
                                     if ann.get("type") == "file_citation":
                                         fn = ann.get("filename", "")
                                         if fn and fn not in [c["filename"] for c in citations]:
                                             citations.append({"file_id": ann.get("file_id", ""), "filename": fn})
-                                if text:
-                                    # Simulate streaming in ~3-word chunks
-                                    words = text.split(" ")
-                                    chunk = []
-                                    for w in words:
-                                        chunk.append(w)
-                                        if len(chunk) >= 3:
-                                            piece = " ".join(chunk) + " "
-                                            compat = {"choices": [{"index": 0, "delta": {"content": piece}}]}
-                                            yield f"data: {_json.dumps(compat)}\n\n"
-                                            await _asyncio.sleep(0.02)
-                                            chunk = []
-                                    if chunk:
-                                        piece = " ".join(chunk)
-                                        compat = {"choices": [{"index": 0, "delta": {"content": piece}}]}
-                                        yield f"data: {_json.dumps(compat)}\n\n"
-                # Send citations as a separate event after the text
-                if citations:
-                    yield f"data: {_json.dumps({'citations': citations})}\n\n"
+
+                # Error in response
+                elif event_type == "response.failed":
+                    error_msg = event.get("response", {}).get("error", {}).get("message", "Response failed")
+                    compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {error_msg}"}}]}
+                    yield f"data: {_json.dumps(compat)}\n\n"
+
+            # Send citations after streaming completes
+            if citations:
+                yield f"data: {_json.dumps({'citations': citations})}\n\n"
+
         except Exception as e:
             logger.exception("Chat error for notebook %s", notebook_id)
             compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {e}"}}]}
