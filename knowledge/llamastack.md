@@ -106,14 +106,10 @@ read-only in OpenShift, causing `PermissionError`.
 
 ### 5. Model IDs Use Provider-Prefixed Names
 
-**Problem:** The built-in config registers models with provider-prefixed IDs like
+The built-in config registers models with provider-prefixed IDs like
 `vllm-inference/llama-3-1-8b-instruct-fp8` instead of bare names like
-`llama-3-1-8b-instruct-fp8`. The notebook-api code may reference bare names.
-
-**Impact:** Model lookups fail if the notebook-api uses bare model names.
-
-**Solution:** Check `/v1/models` endpoint to verify actual model IDs and update
-the notebook-api's model references accordingly.
+`llama-3-1-8b-instruct-fp8`. Any client calling the LlamaStack API must use
+these prefixed names. Check `/v1/models` endpoint to verify actual IDs.
 
 ### 6. VLLM_URL Supports Only One Inference Model
 
@@ -164,6 +160,83 @@ The `metadata_store` field references a SQL backend for file metadata tracking.
 - `remote::pgvector` — Postgres-based vector store (alternative to Milvus)
 - `remote::chroma`, `remote::qdrant`, `remote::weaviate` — other vector stores
 - `kv_redis`, `kv_mongodb` — alternative KV backends
+
+---
+
+## Token Flow: How LlamaStack Reaches Inference Models
+
+LlamaStack calls the MaaS gateway to reach inference models. The token it uses
+determines the user identity and tier for Kuadrant rate limiting.
+
+### Two Deployment Patterns — Two Token Flows
+
+**1. Operator-managed LlamaStack (GenAI Playground — per-user instances)**
+
+Each user gets their own LlamaStack instance in their Data Science Project namespace.
+The token flow preserves per-user identity:
+
+```
+User Browser → OpenShift OAuth → data-science-gateway (EnvoyFilter)
+    → gen-ai-ui (extracts user OAuth token)
+    → LlamaStack (receives token via X-LlamaStack-Provider-Data header)
+        → LlamaStack's remote::vllm provider uses this token as the API key
+        → MaaS gateway (Kuadrant does kubernetesTokenReview on the user's token)
+            → Rate limits applied based on user's tier (free/premium/enterprise)
+            → vLLM model pod
+```
+
+Key mechanism: The `X-LlamaStack-Provider-Data: {"vllm_api_token": "<user-token>"}`
+header **overrides** the config's `api_token` (which defaults to `fake`). This means
+each user's requests are individually rate-limited by Kuadrant based on their own
+OpenShift identity and group membership.
+
+**2. Custom centralized LlamaStack (rag-central — shared instance)**
+
+A single LlamaStack pod serves all users. It uses a **static enterprise-tier SA token**
+configured via `VLLM_API_TOKEN` env var:
+
+```
+Any client → LlamaStack (rag-central namespace)
+    → LlamaStack's remote::vllm provider uses the static enterprise token
+    → MaaS gateway (Kuadrant sees the enterprise SA identity)
+        → Enterprise tier rate limits apply (100K tokens/min)
+        → vLLM model pod
+```
+
+**Important implication:** In the centralized pattern, ALL requests from ALL users
+appear as the same enterprise-tier identity to Kuadrant. Per-user rate limiting
+does NOT happen at the gateway level. If per-user limits are needed, they must be
+implemented at the application layer (the client calling LlamaStack), or the client
+must inject per-user tokens via `X-LlamaStack-Provider-Data` header.
+
+### Token Creation
+
+The enterprise-tier SA token is created from `llamastack-internal` ServiceAccount
+in the `maas-default-gateway-tier-enterprise` namespace:
+
+```bash
+oc create token llamastack-internal \
+  -n maas-default-gateway-tier-enterprise \
+  --audience=maas-default-gateway-sa \
+  --duration=8760h
+```
+
+The `--audience=maas-default-gateway-sa` must match the audience configured in
+Kuadrant's AuthPolicy `kubernetesTokenReview`. Max duration is 8760h (1 year).
+
+### X-LlamaStack-Provider-Data Header
+
+This header allows **per-request token override** without changing the LlamaStack
+config. The header value is a JSON object:
+
+```json
+{"vllm_api_token": "<per-user-token>"}
+```
+
+LlamaStack's `_get_api_key_from_config_or_provider_data()` checks for this header
+on every inference request. If present, the per-user token is used instead of the
+config's static `api_token`. This is the mechanism that enables per-user rate limiting
+even with a shared LlamaStack instance.
 
 ---
 
@@ -224,24 +297,15 @@ These use the same image but with operator-managed configs.
   built-in `/opt/app-root/config.yaml`
 - PVC at `/opt/app-root/src/.llama/distributions/rh/` for local state
 - Token from `llamastack-vllm-token` secret in the workspace namespace
+- Per-user tokens injected via `X-LlamaStack-Provider-Data` header by gen-ai-ui
 - One instance per user/project
+- Per-user rate limiting works because each user's own OAuth token is used
 
 **Our custom rag-central pattern:**
 - No custom ConfigMap — relies entirely on env vars and built-in config
-- No PVC — fully stateless with external backends
+- No PVC — fully stateless with external backends (Postgres, Milvus, S3)
 - Shared across all users
+- Static enterprise-tier token — all requests appear as same identity to Kuadrant
+- Per-user rate limiting requires application-layer implementation or
+  `X-LlamaStack-Provider-Data` token injection by the calling client
 - Deployed via GitOps Helm chart
-
----
-
-## Token Flow for LlamaStack → MaaS Gateway
-
-LlamaStack reaches the MaaS gateway for inference using an enterprise-tier SA token.
-The token is created from `llamastack-internal` SA in
-`maas-default-gateway-tier-enterprise` namespace with audience `maas-default-gateway-sa`.
-
-This bypasses all Kuadrant rate limits (enterprise tier has the highest limits).
-Per-user rate limiting is handled at the notebook-api application level, not at the
-LlamaStack level.
-
-The token has a max duration of 8760h (1 year) and must be rotated before expiry.
