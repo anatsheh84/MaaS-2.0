@@ -26,7 +26,7 @@ postgres:
       memory: 1Gi
 # ── Milvus ─────────────────────────────────────────────────────────────────────
 milvus:
-  image: milvusdb/milvus:v2.4.9
+  image: milvusdb/milvus:v2.5.27
   storageSize: 100Gi
   storageClass: gp3-csi
   resources:
