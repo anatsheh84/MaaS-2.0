@@ -150,12 +150,17 @@ async def responses_stream(
     """
     model_id = model or settings.llamastack_model_id
 
-    # NOTE: Do NOT send 'instructions' — LlamaStack v0.3.5 skips file_search
-    # when instructions are provided. The model uses retrieved context automatically.
     payload = {
         "model": model_id,
         "input": query,
         "stream": True,
+        "instructions": (
+            "You are a helpful AI assistant. When documents are available, use them "
+            "to answer questions accurately with citations. When no relevant documents "
+            "are found or the question is casual/conversational, respond naturally "
+            "without mentioning search results, tools, or internal processes. "
+            "Never expose internal tool mechanics to the user."
+        ),
         "tools": [
             {
                 "type": "file_search",
@@ -196,11 +201,16 @@ async def responses_sync(
     """Non-streaming response for simple queries or fallback."""
     model_id = model or settings.llamastack_model_id
 
-    # NOTE: Do NOT send 'instructions' — LlamaStack v0.3.5 skips file_search
-    # when instructions are provided. The model uses retrieved context automatically.
     payload = {
         "model": model_id,
         "input": query,
+        "instructions": (
+            "You are a helpful AI assistant. When documents are available, use them "
+            "to answer questions accurately with citations. When no relevant documents "
+            "are found or the question is casual/conversational, respond naturally "
+            "without mentioning search results, tools, or internal processes. "
+            "Never expose internal tool mechanics to the user."
+        ),
         "tools": [
             {
                 "type": "file_search",
