@@ -7,6 +7,9 @@ metadata:
   annotations:
     alpha.maas.opendatahub.io/tiers: '["free", "premium", "enterprise"]'
     openshift.io/display-name: {{ .displayName }}
+    {{- if .stopped }}
+    serving.kserve.io/stop: "true"
+    {{- end }}
     {{- if .hardwareProfile }}
     opendatahub.io/hardware-profile-name: {{ .hardwareProfile }}
     opendatahub.io/hardware-profile-namespace: redhat-ods-applications

@@ -2,7 +2,7 @@ image: registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.3.0
 
 models:
   - name: qwen3-4b-instruct
-    enabled: false
+    stopped: true
     displayName: Qwen3 4B Instruct 2507
     uri: oci://quay.io/jharmison/models:qwen--qwen3-4b-instruct-2507-modelcar
     hardwareProfile: nvidia-l40s-single-gpu
@@ -27,7 +27,7 @@ models:
         value: l40-gpu
 
   - name: llama-3-1-8b-instruct-fp8
-    enabled: false
+    stopped: true
     displayName: Llama 3.1 8B Instruct FP8
     uri: oci://registry.redhat.io/rhelai1/modelcar-llama-3-1-8b-instruct-fp8-dynamic:1.5
     hardwareProfile: nvidia-l40s-single-gpu
@@ -53,7 +53,7 @@ models:
         value: l40-gpu
 
   - name: mistral-small-24b-fp8
-    enabled: false
+    stopped: true
     displayName: Mistral Small 3.1 24B Instruct FP8
     uri: oci://registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503-fp8-dynamic:1.5
     hardwareProfile: nvidia-l40s-single-gpu
@@ -80,6 +80,7 @@ models:
 
   - name: phi-4-instruct-w8a8
     enabled: false
+    stopped: true
     displayName: Phi-4 Instruct W8A8
     uri: oci://registry.redhat.io/rhelai1/modelcar-phi-4-quantized-w8a8:1.5
     hardwareProfile: nvidia-l40s-single-gpu
