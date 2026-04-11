@@ -23,6 +23,8 @@ resources:
 
 # Tier namespaces where per-user MaaS SA tokens are provisioned by maas-api
 # notebook-api will look up the authenticated user's SA in these namespaces
-tierNamespaces:
-  - maas-default-gateway-tier-free
-  - maas-default-gateway-tier-premium
+# Disabled until maas-controller is deployed to create these namespaces
+# tierNamespaces:
+#   - maas-default-gateway-tier-free
+#   - maas-default-gateway-tier-premium
+tierNamespaces: []
