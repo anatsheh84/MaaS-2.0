@@ -19,6 +19,10 @@ spec:
       valueFiles:
         - values.yaml
         - values-llmaas.yaml
+      values: |
+        maasBaseUrl: "https://maas.{{ .Values.deployer.domain }}"
+        deployer:
+          domain: {{ .Values.deployer.domain }}
   destination:
     name: in-cluster
     namespace: maas-rag

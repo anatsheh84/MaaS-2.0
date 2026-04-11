@@ -19,6 +19,9 @@ spec:
       valueFiles:
         - values.yaml
         - values-llmaas.yaml
+      values: |
+        deployer:
+          domain: {{ .Values.deployer.domain }}
   destination:
     name: in-cluster
     namespace: maas-rag
