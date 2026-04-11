@@ -1,4 +1,5 @@
 {{- range .Values.models }}
+{{- if ne (toString (default true .enabled)) "false" }}
 ---
 apiVersion: serving.kserve.io/v1alpha1
 kind: LLMInferenceService
@@ -68,4 +69,5 @@ spec:
         medium: Memory
         sizeLimit: 2Gi
       name: shm
+{{- end }}
 {{- end }}

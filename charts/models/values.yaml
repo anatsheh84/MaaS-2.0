@@ -76,6 +76,7 @@ models:
         value: l40-gpu
 
   - name: phi-4-instruct-w8a8
+    enabled: false
     displayName: Phi-4 Instruct W8A8
     uri: oci://registry.redhat.io/rhelai1/modelcar-phi-4-quantized-w8a8:1.5
     hardwareProfile: nvidia-l40s-single-gpu
