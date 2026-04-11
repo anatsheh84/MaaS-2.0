@@ -22,6 +22,19 @@ spec:
       labels:
         app: {{ .name }}
     spec:
+      initContainers:
+      - name: patch-vllm
+        image: {{ .image | default $.Values.image }}
+        command: [sh, -c]
+        args:
+        - |
+          # Copy vllm package to writable volume, then patch matryoshka validation
+          cp -a /opt/app-root/lib64/python3.12/site-packages/vllm/* /patched-vllm/
+          sed -i 's/if self.dimensions is not None and model_config is not None:/if False:  # patched: skip matryoshka validation/' /patched-vllm/pooling_params.py
+          echo "Patched pooling_params.py — matryoshka validation disabled"
+        volumeMounts:
+        - name: vllm-site-packages
+          mountPath: /patched-vllm
       containers:
       - name: vllm
         image: {{ .image | default $.Values.image }}
@@ -65,6 +78,8 @@ spec:
           name: shm
         - mountPath: /tmp/hf-cache
           name: hf-cache
+        - mountPath: /opt/app-root/lib64/python3.12/site-packages/vllm
+          name: vllm-site-packages
       nodeSelector:
         nvidia.com/gpu.present: "true"
       tolerations:
@@ -80,6 +95,8 @@ spec:
       - emptyDir:
           sizeLimit: 5Gi
         name: hf-cache
+      - emptyDir: {}
+        name: vllm-site-packages
 ---
 apiVersion: v1
 kind: Service
