@@ -23,6 +23,5 @@ models:
         memory: 16Gi
         nvidia.com/gpu: "1"
     extraArgs:
-      - --task=embed
       - --max-model-len=8192
       - --gpu-memory-utilization=0.3
