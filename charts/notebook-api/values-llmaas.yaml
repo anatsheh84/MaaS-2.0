@@ -1,6 +1,7 @@
 namespace: maas-rag
 llamastackUrl: "http://llamastack.rag-central.svc.cluster.local:8321"
-llamastackEmbeddingModel: "sentence-transformers/snowflake-embed"
+llamastackEmbeddingModel: "vllm-embedding/snowflake-embed"
+llamastackVectorProvider: "milvus-remote"
 maasBaseUrl: "https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com"
 topKResults: "5"
 chunkSize: "512"

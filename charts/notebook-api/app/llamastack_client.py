@@ -21,12 +21,15 @@ _BASE = settings.llamastack_url
 async def create_vector_store(name: str) -> dict:
     """Create a vector store. Returns the full VS object."""
     async with httpx.AsyncClient(timeout=30.0) as client:
+        body = {
+            "name": name,
+            "embedding_model": settings.llamastack_embedding_model,
+        }
+        if settings.llamastack_vector_provider:
+            body["provider_id"] = settings.llamastack_vector_provider
         resp = await client.post(
             f"{_BASE}/v1/vector_stores",
-            json={
-                "name": name,
-                "embedding_model": settings.llamastack_embedding_model,
-            },
+            json=body,
         )
         resp.raise_for_status()
         vs = resp.json()

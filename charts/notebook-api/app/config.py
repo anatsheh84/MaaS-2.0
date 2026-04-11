@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     llamastack_url: str = "http://llamastack:8321"
     llamastack_embedding_model: str = "sentence-transformers/snowflake-embed"
     llamastack_model_id: str = "maas-qwen3-4b-instruct/qwen3-4b-instruct"
+    llamastack_vector_provider: str = ""  # e.g. "milvus-remote" when multiple providers exist
 
     # MaaS gateway — model discovery only (chat goes through LlamaStack)
     maas_base_url: str = "https://maas.apps.cluster.local"

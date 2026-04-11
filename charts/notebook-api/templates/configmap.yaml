@@ -10,6 +10,7 @@ metadata:
 data:
   LLAMASTACK_URL: {{ .Values.llamastackUrl | quote }}
   LLAMASTACK_EMBEDDING_MODEL: {{ .Values.llamastackEmbeddingModel | quote }}
+  LLAMASTACK_VECTOR_PROVIDER: {{ .Values.llamastackVectorProvider | default "" | quote }}
   MAAS_BASE_URL: {{ .Values.maasBaseUrl | quote }}
   TOP_K_RESULTS: {{ .Values.topKResults | quote }}
   CHUNK_SIZE: {{ .Values.chunkSize | quote }}
