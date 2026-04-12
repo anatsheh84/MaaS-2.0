@@ -28,6 +28,50 @@ spec:
       # correctly identifies it as an embedding model on every startup.
       # Upstream fix: LlamaStack PR #4975, not yet in RHOAI image.
       initContainers:
+      # ── Init 1: wait for Postgres to accept authenticated connections ──
+      - name: wait-for-postgres
+        image: {{ .Values.postgres.image }}
+        command: [bash, -c]
+        args:
+        - |
+          echo "Waiting for Postgres to accept connections..."
+          for i in $(seq 1 30); do
+            if PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" \
+               -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+               -c 'SELECT 1' >/dev/null 2>&1; then
+              echo "Postgres ready (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i/30 failed, retrying in 2s..."
+            sleep 2
+          done
+          echo "ERROR: Postgres not reachable after 60s"
+          exit 1
+        env:
+        - name: POSTGRES_HOST
+          value: llamastack-postgres.{{ .Values.namespace }}.svc.cluster.local
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: {{ .Values.postgres.database }}
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-postgres
+              key: database-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-postgres
+              key: database-password
+        resources:
+          requests:
+            cpu: 50m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+      # ── Init 2: patch vLLM provider to register nomic-embed as embedding ──
       - name: patch-vllm-provider
         image: {{ .Values.llamastack.image }}
         command: [sh, -c]

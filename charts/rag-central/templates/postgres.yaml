@@ -1,5 +1,10 @@
-{{- $existingSecret := (lookup "v1" "Secret" .Values.namespace "llamastack-postgres") }}
 ---
+# Postgres secret — uses static values from values.yaml.
+# IMPORTANT: Do NOT use randAlphaNum or lookup here.  ArgoCD renders
+# manifests with `helm template` (offline), where lookup always returns
+# nil.  Combined with randAlphaNum this causes a new random password on
+# every sync cycle, drifting from the password stored in Postgres on
+# the PVC — the #1 cause of "password authentication failed" crashes.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -9,17 +14,10 @@ metadata:
     app: llamastack-postgres
     app.kubernetes.io/part-of: rag-central
 type: Opaque
-{{- if $existingSecret }}
-data:
-  database-user: {{ index $existingSecret.data "database-user" }}
-  database-password: {{ index $existingSecret.data "database-password" }}
-  database-name: {{ index $existingSecret.data "database-name" }}
-{{- else }}
 stringData:
-  database-user: llamastack
-  database-password: {{ randAlphaNum 24 | quote }}
-  database-name: llamastack
-{{- end }}
+  database-user: {{ .Values.postgres.user }}
+  database-password: {{ .Values.postgres.password }}
+  database-name: {{ .Values.postgres.database }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -53,6 +51,12 @@ spec:
     metadata:
       labels:
         app: llamastack-postgres
+      annotations:
+        # Force pod restart when the secret content changes (e.g. password
+        # updated in values.yaml).  Without this, the Postgres pod keeps
+        # running with the old password while new client pods read the new
+        # secret, causing "password authentication failed".
+        checksum/postgres-secret: {{ include (print $.Template.BasePath "/postgres.yaml") . | sha256sum }}
     spec:
       containers:
       - name: postgresql

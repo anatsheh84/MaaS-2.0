@@ -15,6 +15,9 @@ llamastack:
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
 postgres:
   image: registry.redhat.io/rhel9/postgresql-16@sha256:a8c9a313f69ab99bd8b46ce5df7cb78b00808eedd4f8da05f4654f76c14a152c
+  user: llamastack
+  password: llamastack-db-s3cr3t    # Static default — override in values.local.yaml for production
+  database: llamastack
   storageSize: 10Gi
   storageClass: gp3-csi
   resources:
