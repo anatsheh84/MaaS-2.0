@@ -397,35 +397,12 @@ fi
 
 
 
-# ── Step 5f: Create rag-central secrets (S3, vLLM token) ──────────────────────
+# ── Step 5f: Create rag-central secrets (S3 bucket) ──────────────────────────
 step "Step 5f/7 — Creating rag-central secrets"
 
 RAG_NS="rag-central"
 oc get namespace "$RAG_NS" &>/dev/null || oc create namespace "$RAG_NS"
 info "Namespace $RAG_NS ready"
-
-# --- llamastack-vllm-token: enterprise-tier SA token for MaaS gateway ---
-if oc get secret llamastack-vllm-token -n "$RAG_NS" &>/dev/null; then
-  warn "llamastack-vllm-token already exists in $RAG_NS — skipping"
-else
-  # Wait for the enterprise-tier namespace and SA to exist (created by ArgoCD wave 3)
-  ENTERPRISE_NS="maas-default-gateway-tier-enterprise"
-  if oc get sa llamastack-internal -n "$ENTERPRISE_NS" &>/dev/null 2>&1; then
-    VLLM_TOKEN=$(oc create token llamastack-internal \
-      -n "$ENTERPRISE_NS" \
-      --audience=maas-default-gateway-sa \
-      --duration=8760h)
-    oc create secret generic llamastack-vllm-token \
-      --from-literal=token="$VLLM_TOKEN" \
-      -n "$RAG_NS"
-    success "llamastack-vllm-token created (enterprise-tier, 1yr duration)"
-  else
-    warn "SA llamastack-internal not found in $ENTERPRISE_NS — skipping vLLM token"
-    warn "Run this manually after ArgoCD deploys the gateway tier:"
-    warn "  TOKEN=\$(oc create token llamastack-internal -n $ENTERPRISE_NS --audience=maas-default-gateway-sa --duration=8760h)"
-    warn "  oc create secret generic llamastack-vllm-token --from-literal=token=\$TOKEN -n $RAG_NS"
-  fi
-fi
 
 # --- llamastack-s3: AWS credentials for S3 file storage ---
 if oc get secret llamastack-s3 -n "$RAG_NS" &>/dev/null; then
@@ -437,9 +414,16 @@ else
 
   # Create bucket using AWS CLI if available, otherwise instruct user
   if command -v aws &>/dev/null; then
-    aws s3api create-bucket --bucket "$S3_BUCKET" --region "$REGION" \
-      --create-bucket-configuration LocationConstraint="$REGION" 2>/dev/null || true
-    success "S3 bucket $S3_BUCKET created (or already exists)"
+    export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+    export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
+    if aws s3api create-bucket --bucket "$S3_BUCKET" --region "$REGION" \
+        --create-bucket-configuration LocationConstraint="$REGION" 2>/dev/null; then
+      success "S3 bucket $S3_BUCKET created"
+    elif aws s3api head-bucket --bucket "$S3_BUCKET" 2>/dev/null; then
+      success "S3 bucket $S3_BUCKET already exists"
+    else
+      error "Failed to create S3 bucket $S3_BUCKET. Check AWS credentials and permissions."
+    fi
   else
     warn "AWS CLI not found — create S3 bucket manually:"
     warn "  aws s3api create-bucket --bucket $S3_BUCKET --region $REGION \\"
@@ -548,7 +532,7 @@ echo "  ✔  Created HTPasswd users (user1, user2, admin)
   ✔  Created BuildConfigs for notebook-api + notebook-ui (internal registry)"
 echo "  ✔  Generated LiteMaaS secrets in litemaas namespace"
 echo "  ✔  Created OAuthClient for LiteMaaS"
-echo "  ✔  Created rag-central secrets (vLLM enterprise token + S3 credentials)"
+echo "  ✔  Created rag-central secrets (S3 credentials)"
 echo "  ✔  Deployed bootstrap ArgoCD Application"
 echo "  ✔  Patched bootstrap with real values (no git commit needed)"
 echo ""

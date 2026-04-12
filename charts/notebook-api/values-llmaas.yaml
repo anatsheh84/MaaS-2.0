@@ -2,7 +2,7 @@ namespace: maas-rag
 llamastackUrl: "http://llamastack.rag-central.svc.cluster.local:8321"
 llamastackEmbeddingModel: "vllm-embedding/nomic-embed"
 llamastackVectorProvider: "milvus-remote"
-maasBaseUrl: "https://maas.apps.cluster-ttpwl.ttpwl.sandbox962.opentlc.com"
+maasBaseUrl: "https://maas.apps.cluster.local"
 topKResults: "5"
 chunkSize: "512"
 

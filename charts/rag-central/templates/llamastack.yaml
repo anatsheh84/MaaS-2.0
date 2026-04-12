@@ -43,21 +43,19 @@ spec:
             secretKeyRef:
               name: llamastack-postgres
               key: database-password
-        # ── Inference via MaaS gateway (enterprise token) ──
+        # ── Inference via direct internal KServe service (bypasses MaaS gateway) ──
+        # vLLM on RHOAI 3.4 serves HTTPS on port 8000; no auth needed internally.
         - name: VLLM_URL
-          value: http://maas.{{ .Values.deployer.domain }}/llm/llama-3-1-8b-instruct-fp8/v1
+          value: https://llama-3-1-8b-instruct-fp8-kserve-workload-svc.llm.svc.cluster.local:8000/v1
         - name: VLLM_API_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: llamastack-vllm-token
-              key: token
+          value: fake
         - name: VLLM_TLS_VERIFY
           value: "false"
         - name: VLLM_MAX_TOKENS
           value: "8192"
-        # ── Embedding model ──
+        # ── Embedding model (also direct internal KServe service) ──
         - name: VLLM_EMBEDDING_URL
-          value: http://nomic-embed.llm.svc.cluster.local:8000/v1
+          value: https://nomic-embed.llm.svc.cluster.local:8000/v1
         - name: VLLM_EMBEDDING_API_TOKEN
           value: fake
         - name: VLLM_EMBEDDING_TLS_VERIFY
