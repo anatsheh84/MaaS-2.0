@@ -43,9 +43,9 @@ spec:
             secretKeyRef:
               name: llamastack-postgres
               key: database-password
-        # ── Inference via internal KServe service (enterprise token) ──
+        # ── Inference via MaaS gateway (enterprise token) ──
         - name: VLLM_URL
-          value: http://llama-3-1-8b-instruct-fp8-kserve-workload-svc.llm.svc.cluster.local:8000/v1
+          value: http://maas.{{ .Values.deployer.domain }}/llm/llama-3-1-8b-instruct-fp8/v1
         - name: VLLM_API_TOKEN
           valueFrom:
             secretKeyRef:
