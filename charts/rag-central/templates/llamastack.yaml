@@ -22,6 +22,74 @@ spec:
       labels:
         app: llamastack
     spec:
+      {{- if .Values.llamastack.additionalModels }}
+      initContainers:
+      - name: patch-config
+        image: {{ .Values.llamastack.image }}
+        command: [python3, -c]
+        args:
+        - |
+          import yaml, os
+          cfg_path = '/opt/app-root/config.yaml'
+          out_path = '/patched-config/config.yaml'
+          with open(cfg_path) as f:
+              config = yaml.safe_load(f)
+          # Read token and domain from env
+          token = os.environ.get('VLLM_API_TOKEN', 'fake')
+          domain = os.environ.get('DEPLOYER_DOMAIN', '')
+          # Add a provider for each additional model
+          for model in {{ .Values.llamastack.additionalModels | toJson }}:
+              name = model['name']
+              pid = f'vllm-{name}'
+              url = f'http://maas.{domain}/llm/{name}/v1'
+              provider = {
+                  'provider_id': pid,
+                  'provider_type': 'remote::vllm',
+                  'config': {
+                      'base_url': url,
+                      'max_tokens': 8192,
+                      'api_token': token,
+                      'tls_verify': False,
+                  }
+              }
+              config['providers']['inference'].append(provider)
+              # Register model
+              if 'models' not in config:
+                  config['models'] = []
+              config['models'].append({
+                  'model_id': f'{pid}/{name}',
+                  'provider_id': pid,
+                  'provider_model_id': name,
+                  'model_type': 'llm',
+              })
+              print(f'Added provider {pid} -> {url}')
+          # Fix nomic-embed: register as embedding type with 768 dimensions
+          # (built-in config registers it as llm by default)
+          if 'models' not in config:
+              config['models'] = []
+          config['models'].append({
+              'model_id': 'vllm-embedding/nomic-embed',
+              'provider_id': 'vllm-embedding',
+              'provider_model_id': 'nomic-embed',
+              'model_type': 'embedding',
+              'metadata': {'embedding_dimension': 768},
+          })
+          print('Added nomic-embed as embedding (768 dim)')
+          with open(out_path, 'w') as f:
+              yaml.dump(config, f, default_flow_style=False)
+          print(f'Patched config written to {out_path}')
+        env:
+        - name: VLLM_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: llamastack-vllm-token
+              key: token
+        - name: DEPLOYER_DOMAIN
+          value: {{ .Values.deployer.domain }}
+        volumeMounts:
+        - name: patched-config
+          mountPath: /patched-config
+      {{- end }}
       containers:
       - name: llamastack
         image: {{ .Values.llamastack.image }}
@@ -95,6 +163,10 @@ spec:
         # ── Runtime config ──
         - name: LLAMA_STACK_CONFIG_DIR
           value: /tmp/llama-runtime
+        {{- if .Values.llamastack.additionalModels }}
+        - name: LLAMA_STACK_CONFIG
+          value: /patched-config/config.yaml
+        {{- end }}
         ports:
         - containerPort: 8321
           name: http
@@ -122,11 +194,19 @@ spec:
           mountPath: /tmp/llama-runtime
         - name: llama-home
           mountPath: /opt/app-root/src/.llama
+        {{- if .Values.llamastack.additionalModels }}
+        - name: patched-config
+          mountPath: /patched-config
+        {{- end }}
       volumes:
       - name: runtime
         emptyDir: {}
       - name: llama-home
         emptyDir: {}
+      {{- if .Values.llamastack.additionalModels }}
+      - name: patched-config
+        emptyDir: {}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

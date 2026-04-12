@@ -4,6 +4,11 @@ namespace: rag-central
 llamastack:
   image: registry.redhat.io/rhoai/odh-llama-stack-core-rhel9@sha256:049b304f527514510d39bf94ac8f41b89746901ebc1f0bc26bc8dbba9c8854f4
   replicas: 1
+  # Additional LLM models accessible via the MaaS gateway.
+  # Each model gets its own vLLM provider in LlamaStack's config.
+  # The first model is always configured via VLLM_URL env var (built-in).
+  additionalModels:
+    - name: qwen3-4b-instruct
   resources:
     requests:
       cpu: 500m
