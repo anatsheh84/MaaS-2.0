@@ -22,6 +22,32 @@ spec:
       labels:
         app: llamastack
     spec:
+      # ── Init container: patch vLLM provider to register nomic-embed as embedding ──
+      # LlamaStack auto-discovers models from vLLM and registers nomic-embed as
+      # type=llm. This patch injects embedding_model_metadata so OpenAIMixin.list_models()
+      # correctly identifies it as an embedding model on every startup.
+      # Upstream fix: LlamaStack PR #4975, not yet in RHOAI image.
+      initContainers:
+      - name: patch-vllm-provider
+        image: {{ .Values.llamastack.image }}
+        command: [sh, -c]
+        args:
+        - |
+          VLLM_DIR=/opt/app-root/lib64/python3.12/site-packages/llama_stack/providers/remote/inference/vllm
+          cp -a "$VLLM_DIR"/* /patched-vllm/
+          sed -i '/provider_data_api_key_field.*vllm_api_token/a\
+          \n    # Patched: register nomic-embed as embedding model (upstream fix PR #4975)\
+              embedding_model_metadata: dict[str, dict[str, int]] = {\
+                  "nomic-embed": {"embedding_dimension": 768},\
+              }' /patched-vllm/vllm.py
+          if grep -q 'nomic-embed' /patched-vllm/vllm.py; then
+            echo "Patch applied — nomic-embed will register as embedding"
+          else
+            echo "ERROR: patch failed" && exit 1
+          fi
+        volumeMounts:
+        - name: patched-vllm-provider
+          mountPath: /patched-vllm
       containers:
       - name: llamastack
         image: {{ .Values.llamastack.image }}
@@ -120,10 +146,14 @@ spec:
           mountPath: /tmp/llama-runtime
         - name: llama-home
           mountPath: /opt/app-root/src/.llama
+        - name: patched-vllm-provider
+          mountPath: /opt/app-root/lib64/python3.12/site-packages/llama_stack/providers/remote/inference/vllm
       volumes:
       - name: runtime
         emptyDir: {}
       - name: llama-home
+        emptyDir: {}
+      - name: patched-vllm-provider
         emptyDir: {}
 ---
 apiVersion: v1
