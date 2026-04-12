@@ -22,68 +22,6 @@ spec:
       labels:
         app: llamastack
     spec:
-      {{- if .Values.llamastack.additionalModels }}
-      initContainers:
-      - name: patch-config
-        image: {{ .Values.llamastack.image }}
-        command: [python3, -c]
-        args:
-        - |
-          import os, re
-          with open('/opt/app-root/config.yaml') as f:
-              cfg = f.read()
-          token = os.environ.get('VLLM_API_TOKEN', 'fake')
-          domain = os.environ.get('DEPLOYER_DOMAIN', '')
-          # Build provider blocks to inject (must match YAML indentation of existing providers)
-          extra_providers = ""
-          extra_models = ""
-          {{- range .Values.llamastack.additionalModels }}
-          extra_providers += """  - provider_id: vllm-{{ .name }}
-            provider_type: remote::vllm
-            config:
-              base_url: http://maas.""" + domain + """/llm/{{ .name }}/v1
-              max_tokens: 8192
-              api_token: """ + token + """
-              tls_verify: false
-          """
-          extra_models += """  - model_id: vllm-{{ .name }}/{{ .name }}
-            provider_id: vllm-{{ .name }}
-            provider_model_id: {{ .name }}
-            model_type: llm
-          """
-          print("Added provider vllm-{{ .name }}")
-          {{- end }}
-          # Add nomic-embed as embedding
-          extra_models += """  - model_id: vllm-embedding/nomic-embed
-            provider_id: vllm-embedding
-            provider_model_id: nomic-embed
-            model_type: embedding
-            metadata:
-              embedding_dimension: 768
-          """
-          print("Added nomic-embed as embedding (768 dim)")
-          # Insert extra providers right before the vector_io section
-          cfg = cfg.replace("\n  vector_io:", "\n" + extra_providers + "  vector_io:", 1)
-          # Append models section
-          if "models:" not in cfg:
-              cfg += "\nmodels:\n" + extra_models
-          else:
-              cfg += extra_models
-          with open('/patched-config/config.yaml', 'w') as f:
-              f.write(cfg)
-          print("Patched config ready")
-        env:
-        - name: VLLM_API_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: llamastack-vllm-token
-              key: token
-        - name: DEPLOYER_DOMAIN
-          value: {{ .Values.deployer.domain }}
-        volumeMounts:
-        - name: patched-config
-          mountPath: /patched-config
-      {{- end }}
       containers:
       - name: llamastack
         image: {{ .Values.llamastack.image }}
@@ -105,9 +43,9 @@ spec:
             secretKeyRef:
               name: llamastack-postgres
               key: database-password
-        # ── Inference via MaaS gateway ──
+        # ── Inference via internal KServe service (enterprise token) ──
         - name: VLLM_URL
-          value: http://maas.{{ .Values.deployer.domain }}/llm/llama-3-1-8b-instruct-fp8/v1
+          value: http://llama-3-1-8b-instruct-fp8-kserve-workload-svc.llm.svc.cluster.local:8000/v1
         - name: VLLM_API_TOKEN
           valueFrom:
             secretKeyRef:
@@ -157,10 +95,6 @@ spec:
         # ── Runtime config ──
         - name: LLAMA_STACK_CONFIG_DIR
           value: /tmp/llama-runtime
-        {{- if .Values.llamastack.additionalModels }}
-        - name: LLAMA_STACK_CONFIG
-          value: /patched-config/config.yaml
-        {{- end }}
         ports:
         - containerPort: 8321
           name: http
@@ -188,19 +122,11 @@ spec:
           mountPath: /tmp/llama-runtime
         - name: llama-home
           mountPath: /opt/app-root/src/.llama
-        {{- if .Values.llamastack.additionalModels }}
-        - name: patched-config
-          mountPath: /patched-config
-        {{- end }}
       volumes:
       - name: runtime
         emptyDir: {}
       - name: llama-home
         emptyDir: {}
-      {{- if .Values.llamastack.additionalModels }}
-      - name: patched-config
-        emptyDir: {}
-      {{- end }}
 ---
 apiVersion: v1
 kind: Service
