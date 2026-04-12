@@ -303,6 +303,11 @@ async def chat(
     # Model ID from the UI is already the full LlamaStack identifier
     model_id = body.model or None
 
+    # Check if notebook has documents — skip file_search on empty notebooks
+    # to prevent models from leaking tool call JSON in their responses
+    file_counts = vs.get("file_counts", {})
+    has_documents = (file_counts.get("completed", 0) + file_counts.get("in_progress", 0)) > 0
+
     async def stream_gen():
         """Stream responses from LlamaStack's Responses API (v0.5.0+).
 
@@ -329,7 +334,7 @@ async def chat(
             buffer = ""  # Buffer to detect multi-token patterns
             async for chunk in llamastack_client.responses_stream(
                 query=body.query,
-                vector_store_ids=[notebook_id],
+                vector_store_ids=[notebook_id] if has_documents else [],
                 model=model_id or None,
             ):
                 try:

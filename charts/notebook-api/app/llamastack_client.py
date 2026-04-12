@@ -163,14 +163,19 @@ async def responses_stream(
             "Do not add citation references, source lists, or file IDs at the end "
             "of your response — citations are handled automatically by the system."
         ),
-        "tools": [
+    }
+
+    # Only include file_search tool when the notebook has documents.
+    # Empty notebooks skip tools entirely — prevents models from leaking
+    # tool call JSON (e.g. {"name": "knowledge_search", ...}) in responses.
+    if vector_store_ids:
+        payload["tools"] = [
             {
                 "type": "file_search",
                 "vector_store_ids": vector_store_ids,
                 "max_num_results": settings.top_k_results,
             }
-        ],
-    }
+        ]
 
     logger.info("Responses API: model=%s vs=%s", model_id, vector_store_ids)
 
