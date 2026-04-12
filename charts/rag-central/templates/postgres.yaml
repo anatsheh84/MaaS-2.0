@@ -78,8 +78,6 @@ spec:
             secretKeyRef:
               name: llamastack-postgres
               key: database-name
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
         ports:
         - containerPort: 5432
           protocol: TCP
@@ -97,7 +95,7 @@ spec:
           {{- toYaml .Values.postgres.resources | nindent 10 }}
         volumeMounts:
         - name: postgres-data
-          mountPath: /var/lib/postgresql/data
+          mountPath: /var/lib/pgsql/data
       volumes:
       - name: postgres-data
         persistentVolumeClaim:
