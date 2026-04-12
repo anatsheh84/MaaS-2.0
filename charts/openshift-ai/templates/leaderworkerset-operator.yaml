@@ -22,12 +22,12 @@ metadata:
   namespace: openshift-lws-operator
 spec:
   channel: stable-v1.0
-  name: lws-operator
+  name: leader-worker-set
   source: redhat-operators
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
 ---
-apiVersion: leaderworkerset.x-k8s.io/v1alpha1
+apiVersion: operator.openshift.io/v1
 kind: LeaderWorkerSetOperator
 metadata:
   name: cluster
