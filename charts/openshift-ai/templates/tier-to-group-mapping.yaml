@@ -1,0 +1,26 @@
+# Required by RHOAI 3.4 validating webhook for LLMInferenceService mutations.
+# Without this ConfigMap, any create/update on LLMInferenceService is rejected.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tier-to-group-mapping
+  namespace: redhat-ods-applications
+data:
+  tiers: |
+    - name: free
+      displayName: Free Tier
+      level: 0
+      groups:
+        - tier-free-users
+        - system:authenticated
+    - name: premium
+      displayName: Premium Tier
+      level: 1
+      groups:
+        - tier-premium-users
+    - name: enterprise
+      displayName: Enterprise Tier
+      level: 2
+      groups:
+        - tier-enterprise-users
