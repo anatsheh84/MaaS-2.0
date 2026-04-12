@@ -320,10 +320,13 @@ async def chat(
 
         # Pattern to strip raw citation tokens like <|file-abc123|>
         _FILE_TOKEN_RE = _re.compile(r'<\|file-[a-f0-9]+\|>')
+        # Pattern to detect leaked tool call JSON
+        _TOOL_CALL_RE = _re.compile(r'\{"name":\s*"knowledge_search"')
 
         try:
             citations = []
             citation_block_started = False
+            buffer = ""  # Buffer to detect multi-token patterns
             async for chunk in llamastack_client.responses_stream(
                 query=body.query,
                 vector_store_ids=[notebook_id],
@@ -340,18 +343,34 @@ async def chat(
                 if event_type == "response.output_text.delta":
                     delta_text = event.get("delta", "")
                     if delta_text:
+                        # Skip all text once citation block starts
+                        if citation_block_started:
+                            continue
                         # Detect start of citation block (model-generated)
                         if "Cite sources" in delta_text or "Cite source" in delta_text:
                             citation_block_started = True
                             continue
-                        # Skip all text once citation block starts
-                        if citation_block_started:
+                        # Buffer to detect multi-token patterns
+                        buffer += delta_text
+                        # Check if buffer contains leaked tool call JSON
+                        if _TOOL_CALL_RE.search(buffer):
+                            citation_block_started = True
+                            # Emit everything before the tool call JSON
+                            match = _TOOL_CALL_RE.search(buffer)
+                            clean = buffer[:match.start()].rstrip()
+                            if clean:
+                                compat = {"choices": [{"index": 0, "delta": {"content": clean}}]}
+                                yield f"data: {_json.dumps(compat)}\n\n"
+                            buffer = ""
                             continue
-                        # Strip any inline <|file-...|> tokens
-                        delta_text = _FILE_TOKEN_RE.sub('', delta_text)
-                        if delta_text:
-                            compat = {"choices": [{"index": 0, "delta": {"content": delta_text}}]}
-                            yield f"data: {_json.dumps(compat)}\n\n"
+                        # Flush buffer when it's long enough (no pattern detected)
+                        if len(buffer) > 50:
+                            # Strip any inline <|file-...|> tokens
+                            clean = _FILE_TOKEN_RE.sub('', buffer)
+                            if clean:
+                                compat = {"choices": [{"index": 0, "delta": {"content": clean}}]}
+                                yield f"data: {_json.dumps(compat)}\n\n"
+                            buffer = ""
 
                 # Completed response — extract citations from annotations
                 elif event_type == "response.completed":
@@ -369,6 +388,13 @@ async def chat(
                 elif event_type == "response.failed":
                     error_msg = event.get("response", {}).get("error", {}).get("message", "Response failed")
                     compat = {"choices": [{"index": 0, "delta": {"content": f"\n\n⚠️ Error: {error_msg}"}}]}
+                    yield f"data: {_json.dumps(compat)}\n\n"
+
+            # Flush remaining buffer
+            if buffer and not citation_block_started:
+                clean = _FILE_TOKEN_RE.sub('', buffer)
+                if clean:
+                    compat = {"choices": [{"index": 0, "delta": {"content": clean}}]}
                     yield f"data: {_json.dumps(compat)}\n\n"
 
             # Send citations after streaming completes
