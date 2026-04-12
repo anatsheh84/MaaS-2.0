@@ -253,7 +253,7 @@ A single stateless LlamaStack pod backed by shared external services:
 | Vector IO | Milvus standalone (dedicated, in-namespace) | Document embeddings for RAG |
 | Files | AWS S3 | Raw uploaded documents (PDF, TXT, DOCX) |
 | Inference | MaaS gateway (external) | LLM chat/completions via Kuadrant-protected gateway |
-| Embedding | Snowflake embed (external, in llm namespace) | Vector generation for RAG ingestion |
+| Embedding | Nomic Embed v1.5 (external, in llm namespace) | 768-dim vector generation for RAG ingestion |
 
 ### Why Stateless Matters
 
@@ -309,3 +309,137 @@ These use the same image but with operator-managed configs.
 - Per-user rate limiting requires application-layer implementation or
   `X-LlamaStack-Provider-Data` token injection by the calling client
 - Deployed via GitOps Helm chart
+
+
+---
+
+## RHOAI 3.4 Session Findings (April 2026)
+
+### Embedding Model: Nomic Embed v1.5 replaces Snowflake Arctic
+
+**Why the switch:** Snowflake Arctic Embed L v2.0 has `matryoshka_dimensions: [256]`
+in its HuggingFace config. vLLM 0.13 (RHOAI 3.3.0) validates any explicit `dimensions`
+parameter against this list. LlamaStack 0.5.0 sends `dimensions=N` during embedding
+ingestion (from the model's `embedding_dimension` metadata) but does NOT send it during
+search queries. This creates a dimension mismatch:
+
+- Ingestion: `dimensions=1024` → vLLM rejects (only [256] allowed for matryoshka)
+- Ingestion: `dimensions=256` → vLLM accepts, stores 256-dim vectors
+- Search: no `dimensions` param → vLLM returns 1024-dim → Milvus rejects (mismatch)
+
+**This is a confirmed LlamaStack bug** — inconsistent dimension handling between
+ingestion and search code paths.
+
+**Nomic Embed v1.5** (`nomic-ai/nomic-embed-text-v1.5`):
+- 768 dimensions, no matryoshka support → no dimension validation issues
+- 2048 max context (not 8192 as initially assumed)
+- `NomicBertModel` supported in vLLM 3.3.0 (was rejected in 3.2.5)
+- Requires `--trust-remote-code` vLLM arg
+- Still requires the vLLM matryoshka patch (see below) because LlamaStack sends
+  `dimensions=768` and vLLM rejects ANY `dimensions` param for non-matryoshka models
+
+### vLLM Matryoshka Validation Patch (Init Container)
+
+vLLM 0.13 (RHOAI 3.3.0) rejects the `dimensions` parameter for ANY model that
+doesn't declare matryoshka support. Since LlamaStack 0.5.0 always sends `dimensions`
+during embedding ingestion, ALL embedding models are affected — not just Snowflake.
+
+**Fix:** Init container in the embed-model Deployment copies the vllm package to a
+writable `emptyDir` volume and patches `pooling_params.py`:
+
+```python
+# Original (line 168):
+if self.dimensions is not None and model_config is not None:
+
+# Patched:
+if False:  # patched: skip matryoshka validation
+```
+
+This allows both matryoshka and non-matryoshka models to accept explicit `dimensions`
+without error. The patch is in `charts/embed-model/templates/inferenceservice.yaml`.
+
+**Note:** `--override-pooler-config` is NOT available in vLLM 0.13 (added in 0.14+).
+There is no env var equivalent either.
+
+### Milvus v2.5.27 Required for BM25 Sparse Index
+
+LlamaStack 0.5.0's remote Milvus provider creates collections with a sparse vector
+field using `SPARSE_INVERTED_INDEX` with `metric_type="BM25"`. This BM25 metric type
+was introduced in Milvus 2.5.0. Milvus 2.4.9 does not support it and fails with:
+```
+MilvusException: only IP is the supported metric type for sparse index
+```
+
+### nomic-embed Model Registration Resets on Restart
+
+The built-in config's `vllm-embedding` provider auto-discovers models from the vLLM
+endpoint. It registers `nomic-embed` as `type=llm` by default. After every LlamaStack
+restart, the model must be manually re-registered as `type=embedding` with
+`embedding_dimension: 768`:
+
+```bash
+curl -X DELETE http://localhost:8321/v1/models/vllm-embedding/nomic-embed
+curl -X POST http://localhost:8321/v1/models -H "Content-Type: application/json" \
+  -d '{"model_id":"nomic-embed","provider_id":"vllm-embedding","provider_model_id":"nomic-embed","model_type":"embedding","metadata":{"embedding_dimension":768}}'
+```
+
+**Permanent fix options:**
+- Custom ConfigMap with explicit model registration in `registered_resources`
+- Init container that patches the config to include the correct model type
+- Post-start script that calls the registration API after LlamaStack is healthy
+
+### LlamaStack v0.5.0 Streaming + Instructions Fixed
+
+The v0.3.5 bugs are confirmed fixed in v0.5.0:
+- **Streaming + file_search:** v0.3.5 skipped file_search results when streaming was
+  enabled. v0.5.0 correctly injects retrieved context during streaming.
+- **Instructions + file_search:** v0.3.5 skipped file_search when `instructions` were
+  provided. v0.5.0 handles both correctly.
+
+### Citation Token Leaking (LlamaStack Design Issue)
+
+LlamaStack injects `<|file-{id}|>` annotation tokens into the model prompt alongside
+retrieved document chunks. The model (especially Llama 3.1 8B) frequently echoes these
+tokens in its output, along with:
+- `"Cite sources:"` blocks listing file IDs
+- Raw tool call JSON: `{"name": "knowledge_search", "parameters": {...}}`
+
+**This is a LlamaStack v0.5.0 design issue** — not configurable via any env var, RHOAI
+setting, or vLLM parameter. The annotation injection is hardcoded in the `inline::rag-runtime`
+provider and the Responses API handler.
+
+**Mitigations applied:**
+1. Instructions tell the model not to add citations (partially effective)
+2. Application-level streaming filter strips `<|file-...|>` tokens, citation blocks,
+   and leaked `knowledge_search` tool call JSON
+
+**Permanent fix:** Upgrade to LlamaStack 0.7.x+ when available in RHOAI.
+
+### Postgres Connection Issue on LlamaStack Restart
+
+**Observed behavior:** When LlamaStack pods are restarted (e.g., by ArgoCD sync),
+they frequently fail to connect to Postgres with `RuntimeError: Could not connect
+to PostgreSQL database server`, even though the Postgres pod is running and healthy.
+
+**Workaround:** Restart the Postgres deployment. LlamaStack then connects successfully
+on its next restart attempt.
+
+**Root cause:** Unknown — possibly a connection pool exhaustion issue or a DNS
+resolution timing problem during pod startup.
+
+### Multi-Model Support Limitation
+
+The built-in RHOAI config supports only ONE inference model via `VLLM_URL`. Adding
+additional models (e.g., Qwen alongside Llama) requires a second `remote::vllm` provider,
+which cannot be created via the API (POST /v1/providers returns 405 Method Not Allowed).
+
+**Options evaluated:**
+1. **Init container config patching** — failed due to `yaml.safe_load/dump` destroying
+   the `${env.VAR}` substitution syntax in the built-in config
+2. **Direct KServe service access** — failed due to cross-namespace NetworkPolicy/Istio
+   blocking (KServe workload services return empty reply from other namespaces)
+3. **Custom ConfigMap** — the approach used on the old cluster (v0.3.5). Requires
+   replicating the full LlamaStack config (~345 lines) but with env var references
+   preserved. This is the proven path forward.
+
+**Current state:** Single model (Llama 3.1 8B) via MaaS gateway. Multi-model is parked.
