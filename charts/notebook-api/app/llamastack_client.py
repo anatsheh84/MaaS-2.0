@@ -156,10 +156,12 @@ async def responses_stream(
         "stream": True,
         "instructions": (
             "You are a helpful AI assistant. When documents are available, use them "
-            "to answer questions accurately with citations. When no relevant documents "
-            "are found or the question is casual/conversational, respond naturally "
+            "to answer questions accurately. When no relevant documents are found "
+            "or the question is casual/conversational, respond naturally "
             "without mentioning search results, tools, or internal processes. "
-            "Never expose internal tool mechanics to the user."
+            "Never expose internal tool mechanics to the user. "
+            "Do not add citation references, source lists, or file IDs at the end "
+            "of your response — citations are handled automatically by the system."
         ),
         "tools": [
             {
@@ -206,10 +208,12 @@ async def responses_sync(
         "input": query,
         "instructions": (
             "You are a helpful AI assistant. When documents are available, use them "
-            "to answer questions accurately with citations. When no relevant documents "
+            "to answer questions accurately. When no relevant documents "
             "are found or the question is casual/conversational, respond naturally "
             "without mentioning search results, tools, or internal processes. "
-            "Never expose internal tool mechanics to the user."
+            "Never expose internal tool mechanics to the user. "
+            "Do not add citation references, source lists, or file IDs at the end "
+            "of your response — citations are handled automatically by the system."
         ),
         "tools": [
             {
