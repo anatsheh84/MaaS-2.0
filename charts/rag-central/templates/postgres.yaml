@@ -56,7 +56,7 @@ spec:
         # updated in values.yaml).  Without this, the Postgres pod keeps
         # running with the old password while new client pods read the new
         # secret, causing "password authentication failed".
-        checksum/postgres-secret: {{ include (print $.Template.BasePath "/postgres.yaml") . | sha256sum }}
+        checksum/postgres-secret: {{ printf "%s-%s-%s" .Values.postgres.user .Values.postgres.password .Values.postgres.database | sha256sum }}
     spec:
       containers:
       - name: postgresql
