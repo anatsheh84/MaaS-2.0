@@ -773,7 +773,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "kube_pod_container_resource_requests{node=~\"$node\", resource=\"nvidia_com_gpu\"} > 0",
-              "legendFormat": "{{pod}}",
+              "legendFormat": "{{ "{{" }}pod{{ "}}" }}",
               "refId": "A",
               "format": "table",
               "instant": true
@@ -1152,7 +1152,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_GPU_UTIL{gpu=~\"$gpu\"}",
-              "legendFormat": "GPU {{gpu}} ({{exported_pod}})",
+              "legendFormat": "GPU {{ "{{" }}gpu{{ "}}" }} ({{ "{{" }}exported_pod{{ "}}" }})",
               "refId": "A"
             }
           ]
@@ -1245,7 +1245,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_PROF_GR_ENGINE_ACTIVE{gpu=~\"$gpu\"}",
-              "legendFormat": "GR Engine GPU {{gpu}}",
+              "legendFormat": "GR Engine GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "A"
             },
             {
@@ -1254,7 +1254,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{gpu=~\"$gpu\"}",
-              "legendFormat": "Tensor GPU {{gpu}}",
+              "legendFormat": "Tensor GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "B"
             }
           ]
@@ -1347,7 +1347,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_ENC_UTIL{gpu=~\"$gpu\"}",
-              "legendFormat": "Enc GPU {{gpu}}",
+              "legendFormat": "Enc GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "A"
             },
             {
@@ -1356,7 +1356,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_DEC_UTIL{gpu=~\"$gpu\"}",
-              "legendFormat": "Dec GPU {{gpu}}",
+              "legendFormat": "Dec GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "B"
             },
             {
@@ -1365,7 +1365,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_MEM_COPY_UTIL{gpu=~\"$gpu\"}",
-              "legendFormat": "MemCopy GPU {{gpu}}",
+              "legendFormat": "MemCopy GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "C"
             }
           ]
@@ -1470,7 +1470,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_FB_USED{gpu=~\"$gpu\"}",
-              "legendFormat": "Used GPU {{gpu}}",
+              "legendFormat": "Used GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "A"
             },
             {
@@ -1479,7 +1479,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_FB_FREE{gpu=~\"$gpu\"}",
-              "legendFormat": "Free GPU {{gpu}}",
+              "legendFormat": "Free GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "B"
             },
             {
@@ -1488,7 +1488,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_FB_RESERVED{gpu=~\"$gpu\"}",
-              "legendFormat": "Reserved GPU {{gpu}}",
+              "legendFormat": "Reserved GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "C"
             }
           ]
@@ -2126,7 +2126,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_GPU_TEMP{gpu=~\"$gpu\"}",
-              "legendFormat": "GPU {{gpu}} core",
+              "legendFormat": "GPU {{ "{{" }}gpu{{ "}}" }} core",
               "refId": "A"
             },
             {
@@ -2135,7 +2135,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_MEMORY_TEMP{gpu=~\"$gpu\"}",
-              "legendFormat": "GPU {{gpu}} mem",
+              "legendFormat": "GPU {{ "{{" }}gpu{{ "}}" }} mem",
               "refId": "B"
             }
           ]
@@ -2236,7 +2236,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_POWER_USAGE{gpu=~\"$gpu\"}",
-              "legendFormat": "GPU {{gpu}}",
+              "legendFormat": "GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "A"
             }
           ]
@@ -2329,7 +2329,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_SM_CLOCK{gpu=~\"$gpu\"}",
-              "legendFormat": "SM GPU {{gpu}}",
+              "legendFormat": "SM GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "A"
             },
             {
@@ -2338,7 +2338,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_MEM_CLOCK{gpu=~\"$gpu\"}",
-              "legendFormat": "Mem GPU {{gpu}}",
+              "legendFormat": "Mem GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "B"
             }
           ]
@@ -2431,7 +2431,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION{gpu=~\"$gpu\"}",
-              "legendFormat": "GPU {{gpu}}",
+              "legendFormat": "GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "A"
             }
           ]
@@ -2537,7 +2537,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(DCGM_FI_PROF_PCIE_TX_BYTES{gpu=~\"$gpu\"}[5m])",
-              "legendFormat": "TX GPU {{gpu}}",
+              "legendFormat": "TX GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "A"
             },
             {
@@ -2546,7 +2546,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(DCGM_FI_PROF_PCIE_RX_BYTES{gpu=~\"$gpu\"}[5m])",
-              "legendFormat": "RX GPU {{gpu}}",
+              "legendFormat": "RX GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "B"
             }
           ]
@@ -2639,7 +2639,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{gpu=~\"$gpu\"}",
-              "legendFormat": "NVLink GPU {{gpu}}",
+              "legendFormat": "NVLink GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "A"
             },
             {
@@ -2648,7 +2648,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_PROF_DRAM_ACTIVE{gpu=~\"$gpu\"}",
-              "legendFormat": "DRAM Active GPU {{gpu}}",
+              "legendFormat": "DRAM Active GPU {{ "{{" }}gpu{{ "}}" }}",
               "refId": "B"
             }
           ]
@@ -3196,7 +3196,7 @@ spec:
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "DCGM_FI_DEV_XID_ERRORS",
-              "legendFormat": "{{gpu}}",
+              "legendFormat": "{{ "{{" }}gpu{{ "}}" }}",
               "refId": "A",
               "format": "table",
               "instant": true
